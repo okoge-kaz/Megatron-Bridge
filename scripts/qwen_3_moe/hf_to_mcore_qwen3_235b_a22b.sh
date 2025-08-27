@@ -27,21 +27,16 @@ module load hpcx/2.23.0
 source /home/acf15649kv/src/Megatron-LM-v0.13.0rc2/.venv/bin/activate
 
 # model config
-HF_CHECKPOINT_DIR=/groups/gag51395/hf_checkpoints/Qwen3-8B-Base
-MEGATRON_CHECKPOINT_DIR=/groups/gag51395/checkpoints/hf-to-megatron/Megatron-Bridge/Qwen3-8B-Base
+HF_CHECKPOINT_DIR=/groups/gag51395/hf_checkpoints/Qwen3-235B-A22B-Thinking-2507
+MEGATRON_CHECKPOINT_DIR=/groups/gag51395/checkpoints/hf-to-megatron/Megatron-Bridge/Qwen3-235B-A22B-Thinking-2507
 
 mkdir -p ${MEGATRON_CHECKPOINT_DIR}
-
-# tokenizer config
-TOKENIZER_MODEL=/groups/gag51395/hf_checkpoints/Qwen3-8B-Base
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 MEGATRON_LM_PATH=/home/acf15649kv/src/Megatron-LM-v0.13.0rc2
 MEGATRON_BRIDGE_PATH=/home/acf15649kv/src/Megatron-Bridge/src
 export PYTHONPATH=$PYTHONPATH:$MEGATRON_LM_PATH
 export PYTHONPATH=$PYTHONPATH:$MEGATRON_BRIDGE_PATH
-
-export MEGATRON_ARGS=1
 
 # convert
 python examples/models/checkpoint_conversion.py import \
