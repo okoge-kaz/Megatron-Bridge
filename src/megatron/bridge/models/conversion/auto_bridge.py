@@ -525,6 +525,7 @@ class AutoBridge(Generic[MegatronModelT]):
         model = load_megatron_model(
             str(checkpoint_path),
             use_cpu_init=True,
+            model_type=kwargs.get("model_type", "gpt"),  # type: ignore
         )
         return model if isinstance(model, list) else [model]
 
@@ -583,6 +584,7 @@ class AutoBridge(Generic[MegatronModelT]):
         megatron_path: str | Path,
         hf_path: str | Path,
         show_progress: bool = True,
+        model_type: Optional[str] = None,
     ) -> None:
         """
         Export a Megatron checkpoint to HuggingFace format.
@@ -623,7 +625,7 @@ class AutoBridge(Generic[MegatronModelT]):
         # Export ckpt performs on CPU
         with temporary_distributed_context(backend="gloo"):
             # Load the Megatron model
-            megatron_model = self.load_megatron_model(megatron_path, wrap_with_ddp=False)
+            megatron_model = self.load_megatron_model(megatron_path, wrap_with_ddp=False, model_type=model_type)
 
             # Save in HuggingFace format
             self.save_hf_pretrained(megatron_model, hf_path, show_progress=show_progress)
