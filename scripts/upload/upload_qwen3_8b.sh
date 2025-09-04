@@ -32,7 +32,7 @@ upload_checkpoint() {
 for ITERATION in "${ITERATIONS[@]}"; do
   FORMATTED_ITERATION="$(printf "%07d" "${ITERATION}")"
   upload_dir=$upload_base_dir/iteration_${FORMATTED_ITERATION}
-  repo_name="tokyotech-llm/Qwen3-8B-LR-ablation-LR2.5E-5-iter${ITERATION}"
+  repo_name="tokyotech-llm/Qwen3-8B-LR-ablation-LR2.5E-5-iter${FORMATTED_ITERATION}"
 
   if ! upload_checkpoint "$upload_dir" "$repo_name"; then
     echo "Skipping to next checkpoint after repeated failures for $repo_name"
