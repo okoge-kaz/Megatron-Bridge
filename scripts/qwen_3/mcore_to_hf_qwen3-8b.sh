@@ -33,7 +33,7 @@ for ITERATION in "${ITERATIONS[@]}"; do
   echo -e "Converting iteration ${ITERATION}\n"
 
   # model config
-  HF_CHECKPOINT_DIR=/groups/gag51395/hf_checkpoints/Qwen3-8B
+  HF_CHECKPOINT_DIR=/groups/gag51395/hf_checkpoints/Qwen3-8B-Base
   MEGATRON_CHECKPOINT_DIR=/groups/gch51639/fujii/checkpoints/Qwen-3-8B/tp2-pp1-ct1/LR2.50E-5-MINLR2.50E-6-WD0.1/iter_${FORMATTED_ITERATION}
   HF_CHECKPOINT_SAVE_DIR=/groups/gch51639/fujii/checkpoints/megatron-to-hf/Qwen3-8B/tp2-pp1-ct1/LR2.50E-5-MINLR2.50E-6-WD0.1/iteration_${FORMATTED_ITERATION}
   mkdir -p "${HF_CHECKPOINT_SAVE_DIR}"
