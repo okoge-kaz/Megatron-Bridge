@@ -29,8 +29,8 @@ from megatron.core.utils import get_model_config
 
 from megatron.bridge.models.model_provider import ModelParallelKwargs, ModelProviderMixin
 from megatron.bridge.training.checkpointing import save_checkpoint
-from megatron.bridge.training.config import CheckpointConfig, ConfigContainer, LoggerConfig
-from megatron.bridge.training.state import GlobalState
+from megatron.bridge.training.config import CheckpointConfig, ConfigContainer, LoggerConfig, TrainingConfig
+from megatron.bridge.training.state import GlobalState, TrainState
 from megatron.bridge.training.tokenizers.tokenizer import MegatronTokenizer, build_tokenizer
 from megatron.bridge.training.utils.checkpoint_utils import file_exists
 from megatron.bridge.utils.vocab_utils import calculate_padded_vocab_size
@@ -359,6 +359,7 @@ def save_megatron_model(
     path: Union[str, Path],
     ckpt_format: str = "torch_dist",
     hf_tokenizer_path: Optional[Union[str, Path]] = None,
+    iteration: Optional[int] = None,
 ) -> None:
     """Save a Megatron model in native Megatron checkpoint format without optimizer state.
 
@@ -432,6 +433,7 @@ def save_megatron_model(
         ),
         dist=None,
     )
+    state.train_state = TrainState(step=iteration if iteration is not None else 0)
 
     # Save the checkpoint
     save_checkpoint(

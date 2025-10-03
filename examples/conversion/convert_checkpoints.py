@@ -88,6 +88,7 @@ def import_hf_to_megatron(
     torch_dtype: Optional[str] = None,
     device_map: Optional[str] = None,
     trust_remote_code: bool = False,
+    iteration: Optional[int] = None,
 ) -> None:
     """
     Import a HuggingFace model and save it as a Megatron checkpoint.
@@ -120,6 +121,7 @@ def import_hf_to_megatron(
     AutoBridge.import_ckpt(
         hf_model_id=hf_model,
         megatron_path=megatron_path,
+        iteration=iteration,
         **kwargs,
     )
 
@@ -221,6 +223,7 @@ def main():
     import_parser.add_argument("--torch-dtype", choices=["float32", "float16", "bfloat16"], help="Model precision")
     import_parser.add_argument("--device-map", help='Device placement strategy (e.g., "auto", "cuda:0")')
     import_parser.add_argument("--trust-remote-code", action="store_true", help="Allow custom model code execution")
+    import_parser.add_argument("--iteration", type=int, help="Specific checkpoint iteration to load", default=None)
 
     # Export subcommand (Megatron -> HF)
     export_parser = subparsers.add_parser("export", help="Export Megatron checkpoint to HuggingFace format")
@@ -247,6 +250,7 @@ def main():
             torch_dtype=args.torch_dtype,
             device_map=args.device_map,
             trust_remote_code=args.trust_remote_code,
+            iteration=args.iteration,
         )
 
     elif args.command == "export":
