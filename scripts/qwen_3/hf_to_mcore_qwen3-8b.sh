@@ -44,7 +44,7 @@ export PYTHONPATH=$PYTHONPATH:$MEGATRON_BRIDGE_PATH
 export MEGATRON_ARGS=1
 
 # convert
-python examples/models/checkpoint_conversion.py import \
+python examples/conversion/convert_checkpoints.py import \
   --hf-model ${HF_CHECKPOINT_DIR} \
   --megatron-path ${MEGATRON_CHECKPOINT_DIR} \
   --torch-dtype bfloat16

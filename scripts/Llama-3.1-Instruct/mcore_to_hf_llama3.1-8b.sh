@@ -50,7 +50,7 @@ for ITERATION in "${ITERATIONS[@]}"; do
   export PYTHONPATH="$PYTHONPATH:$MEGATRON_LM_PATH:$MEGATRON_BRIDGE_PATH"
 
   # convert
-  python examples/models/checkpoint_conversion.py export \
+  python examples/conversion/convert_checkpoints.py export \
     --hf-model "${HF_CHECKPOINT_DIR}" \
     --megatron-path "${MEGATRON_CHECKPOINT_DIR}" \
     --hf-path "${HF_CHECKPOINT_SAVE_DIR}" \
