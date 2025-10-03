@@ -17,15 +17,15 @@ from dataclasses import dataclass
 
 import pytest
 import torch
-from megatron.core.distributed import DistributedDataParallelConfig
-from megatron.core.optimizer import OptimizerConfig
 
 from megatron.bridge.models.llama import Llama3ModelProvider
 from megatron.bridge.training.config import (
     CheckpointConfig,
     ConfigContainer,
+    DistributedDataParallelConfig,
     LoggerConfig,
     MockGPTDatasetConfig,
+    OptimizerConfig,
     RNGConfig,
     SchedulerConfig,
     TokenizerConfig,
@@ -49,6 +49,7 @@ class Llama3ModelProvider145M(Llama3ModelProvider):
     hidden_size: int = 768
     ffn_hidden_size: int = 2688
     num_attention_heads: int = 16
+    vocab_size: int | None = None
 
 
 class TestPretrainResume:

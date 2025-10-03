@@ -16,7 +16,6 @@ import os
 from typing import List, Optional, Union
 
 import torch
-from megatron.core.distributed import DistributedDataParallelConfig
 
 from megatron.bridge.models.llama import Llama31ModelProvider8B
 from megatron.bridge.recipes.utils.dataset_utils import get_blend_fields_from_data_paths
@@ -29,6 +28,7 @@ from megatron.bridge.training.comm_overlap import (
 from megatron.bridge.training.config import (
     CheckpointConfig,
     ConfigContainer,
+    DistributedDataParallelConfig,
     GPTDatasetConfig,
     LoggerConfig,
     RNGConfig,
@@ -88,13 +88,16 @@ def pretrain_config(
     virtual_pipeline_parallelism: Optional[int] = None,
     context_parallelism: int = 2,
     sequence_parallelism: bool = False,
+    use_megatron_fsdp: bool = False,
     # Training hyperparameters
     train_iters: int = 1_168_251,
+    seq_length: int = 8192,
     global_batch_size: int = 512,
     micro_batch_size: int = 1,
     lr: float = 3e-4,
     min_lr: float = 3e-5,
     lr_warmup_iters: int = 2000,
+    lr_decay_iters: Optional[int] = None,
     # Precision recipe
     precision_config: Optional[Union[MixedPrecisionConfig, str]] = "bf16_mixed",
     comm_overlap_config: Optional[CommOverlapConfig] = None,
@@ -119,11 +122,13 @@ def pretrain_config(
         context_parallelism (int): Degree of context parallelism to be passed to model_config.
         sequence_parallelism (bool): Whether to use sequence parallelism.
         train_iters (int): Total number of training iterations.
+        seq_length (int): Sequence length for training.
         global_batch_size (int): Global batch size for training.
         micro_batch_size (int): Micro batch size for training.
         lr (float): Learning rate.
         min_lr (float): Minimum learning rate for cosine decay.
         lr_warmup_iters (int): Number of warmup iterations for the learning rate.
+        lr_decay_iters (Optional[int]): Number of iterations for learning rate decay.
         precision_config (Optional[Union[MixedPrecisionConfig, str]]): Precision configuration for the model.
         comm_overlap_config (Optional[CommOverlapConfig]): Communication overlap configuration for the model.
 
@@ -147,10 +152,11 @@ def pretrain_config(
         context_parallelism=context_parallelism,
         sequence_parallelism=sequence_parallelism,
     )
+    model_cfg.seq_length = seq_length
 
     opt_config, scheduler = distributed_fused_adam_with_cosine_annealing(
         lr_warmup_iters=lr_warmup_iters,
-        lr_decay_iters=train_iters,
+        lr_decay_iters=lr_decay_iters,
         max_lr=lr,
         min_lr=min_lr,
     )
@@ -177,13 +183,14 @@ def pretrain_config(
             overlap_param_gather=True,
             average_in_collective=True,
             use_distributed_optimizer=True,
+            use_megatron_fsdp=use_megatron_fsdp,  # need use_distributed_optimizer=True
         ),
         dataset=GPTDatasetConfig(
             random_seed=1234,
             reset_attention_mask=False,
             reset_position_ids=False,
             eod_mask_loss=False,
-            sequence_length=8192,
+            sequence_length=seq_length,
             num_dataset_builder_threads=1,
             blend=blend,
             blend_per_split=blend_per_split,
@@ -191,7 +198,8 @@ def pretrain_config(
             # Dataloader config parameters
             data_sharding=True,
             dataloader_type="single",
-            num_workers=1,
+            num_workers=8,
+            skip_getting_attention_mask_from_dataset=True,
         ),
         logger=LoggerConfig(
             log_interval=10,
@@ -209,14 +217,20 @@ def pretrain_config(
         mixed_precision=precision_config,
     )
 
-    if cfg.comm_overlap is None:
-        cfg.comm_overlap = CommOverlapConfig(
-            tp_comm_overlap=True,
-            tp_comm_overlap_cfg=userbuffers_bf16_h100_h16384_tp8_cp2_mbs1_seqlen8192,
-            defer_embedding_wgrad_compute=True,
-            wgrad_deferral_limit=50,
-            overlap_param_gather_with_optimizer_step=False,  # Currently disabled due to an issue with checkpointing
-            align_param_gather=True,
-        )
+    # TODO(ananthsub): Temporarily disabled as the extra allocations causes an OOM on a single node
+    # if cfg.comm_overlap is None:
+    #     cfg.comm_overlap = get_comm_overlap_config()
 
     return cfg
+
+
+def get_comm_overlap_config() -> CommOverlapConfig:
+    """Communication overlap configuration for the Llama3.1 8B model."""
+    return CommOverlapConfig(
+        tp_comm_overlap=True,
+        tp_comm_overlap_cfg=userbuffers_bf16_h100_h16384_tp8_cp2_mbs1_seqlen8192,
+        defer_embedding_wgrad_compute=True,
+        wgrad_deferral_limit=50,
+        overlap_param_gather_with_optimizer_step=False,  # Currently disabled due to an issue with checkpointing
+        align_param_gather=True,
+    )

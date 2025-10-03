@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import warnings
 from dataclasses import dataclass, field
 from functools import partial
 from typing import TYPE_CHECKING, Callable, List, Optional, Union
@@ -18,9 +19,10 @@ from typing import TYPE_CHECKING, Callable, List, Optional, Union
 import torch
 import torch.nn.functional as F
 from megatron.core.models.gpt.gpt_layer_specs import get_gpt_decoder_block_spec
-from megatron.core.transformer.transformer_config import MLATransformerConfig
 
 from megatron.bridge.models.gpt_provider import GPTModelProvider
+from megatron.bridge.models.transformer_config import MLATransformerConfig
+from megatron.bridge.utils.common_utils import get_rank_safe
 
 
 try:
@@ -38,7 +40,7 @@ if HAVE_TE:
 
 
 @dataclass
-class DeepSeekProvider(MLATransformerConfig, GPTModelProvider):
+class DeepSeekModelProvider(MLATransformerConfig, GPTModelProvider):
     """
     Base config for DeepSeek V2 and V3 models.
     """
@@ -99,19 +101,21 @@ class DeepSeekProvider(MLATransformerConfig, GPTModelProvider):
     account_for_embedding_in_pipeline_split: bool = False
     account_for_loss_in_pipeline_split: bool = False
 
+    # MLA specific
+    multi_latent_attention: bool = True
+
     # fusions
     apply_rope_fusion: bool = False
     bias_activation_fusion: bool = True
     bias_dropout_fusion: bool = True
     masked_softmax_fusion: bool = True
-    gradient_accumulation_fusion: bool = True
     cross_entropy_loss_fusion: bool = True
     cross_entropy_fusion_impl: str = "te"
     moe_permute_fusion: bool = is_te_min_version("2.1.0") if HAVE_TE else False
 
 
 @dataclass
-class DeepSeekV2Provider(DeepSeekProvider):
+class DeepSeekV2ModelProvider(DeepSeekModelProvider):
     """
     DeepSeek-V2 Model: https://github.com/deepseek-ai/DeepSeek-V2
     """
@@ -130,10 +134,11 @@ class DeepSeekV2Provider(DeepSeekProvider):
     moe_aux_loss_coeff: float = 1e-3
     mscale: float = 0.707
     mscale_all_dim: float = 0.707
+    vocab_size: int = 102400
 
 
 @dataclass
-class DeepSeekV2LiteProvider(DeepSeekV2Provider):
+class DeepSeekV2LiteModelProvider(DeepSeekV2ModelProvider):
     """
     DeepSeek-V2-Lite Model: https://github.com/deepseek-ai/DeepSeek-V2
     HuggingFace: https://huggingface.co/deepseek-ai/DeepSeek-V2-Lite
@@ -153,10 +158,11 @@ class DeepSeekV2LiteProvider(DeepSeekV2Provider):
     moe_router_num_groups: int = 1
     moe_router_group_topk: int = 1
     moe_router_topk_scaling_factor: float = 1.0
+    vocab_size: int = 102400
 
 
 @dataclass
-class DeepSeekV3Provider(DeepSeekProvider):
+class DeepSeekV3ModelProvider(DeepSeekModelProvider):
     """
     DeepSeek-V3 Model: https://github.com/deepseek-ai/DeepSeek-V3
     """
@@ -174,10 +180,132 @@ class DeepSeekV3Provider(DeepSeekProvider):
     moe_router_num_groups: int = 8
     moe_router_group_topk: int = 4
     moe_router_topk_scaling_factor: float = 2.5
-    moe_aux_loss_coeff: float = 1e-4
     make_vocab_size_divisible_by: int = 1280
     moe_router_score_function: str = "sigmoid"
     moe_router_enable_expert_bias: bool = True
     moe_router_bias_update_rate: float = 1e-3
     mscale: float = 1.0
     mscale_all_dim: float = 1.0
+    vocab_size: int = 129280
+
+
+@dataclass
+class MoonlightModelProvider16B(DeepSeekModelProvider):
+    """
+    Moonlight-16B-A3B Model: https://github.com/moonshotai/Moonlight-16B-A3B
+
+    Moonlight is based on DeepSeek-V3.
+    """
+
+    max_position_embeddings: int = 4096
+    num_layers: int = 27
+    hidden_size: int = 2048
+    ffn_hidden_size: int = 11264
+    num_attention_heads: int = 16
+    kv_channels: int = 16
+    num_moe_experts: int = 64
+    moe_ffn_hidden_size: int = 1408
+    moe_shared_expert_intermediate_size: int = 2816  # 1408 * 2 shared expert
+    moe_layer_freq: Union[int, List[int]] = field(default_factory=lambda: [0] * 1 + [1] * 26)  # first layer is dense
+    moe_router_topk: int = 6
+    moe_router_num_groups: int = 1
+    moe_router_group_topk: int = 1
+    moe_router_topk_scaling_factor: float = 2.446
+    moe_aux_loss_coeff: float = 0.001
+    make_vocab_size_divisible_by: int = 1280
+    moe_router_score_function: str = "sigmoid"
+    moe_router_enable_expert_bias: bool = True
+    rotary_scaling_factor: float = 1.0
+    mscale: float = 1.0
+    mscale_all_dim: float = 1.0
+    rotary_base: float = 50000
+    layernorm_epsilon: float = 1e-5
+    q_lora_rank: int = None
+    init_method_std: float = 0.02
+    moe_router_bias_update_rate: float = 1e-3
+    rotary_percent: float = 1.0
+    vocab_size: int = 163840
+
+
+# -----------------------------------------------------------------------------
+# Deprecated aliases (to be removed in a future release)
+# -----------------------------------------------------------------------------
+
+
+def _warn_deprecated(old_cls: str, new_cls: str) -> None:
+    if get_rank_safe() == 0:
+        warnings.warn(
+            f"{old_cls} is deprecated and will be removed in a future release. Use {new_cls} instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+
+@dataclass
+class DeepSeekProvider(DeepSeekModelProvider):
+    """Deprecated alias for ``DeepSeekModelProvider``.
+
+    Deprecated:
+        This alias remains for backward compatibility and will be removed in a
+        future release. Import and use ``DeepSeekModelProvider`` instead.
+    """
+
+    def __post_init__(self) -> None:
+        _warn_deprecated("DeepSeekProvider", "DeepSeekModelProvider")
+        super().__post_init__()
+
+
+@dataclass
+class DeepSeekV2Provider(DeepSeekV2ModelProvider):
+    """Deprecated alias for ``DeepSeekV2ModelProvider``.
+
+    Deprecated:
+        This alias remains for backward compatibility and will be removed in a
+        future release. Import and use ``DeepSeekV2ModelProvider`` instead.
+    """
+
+    def __post_init__(self) -> None:
+        _warn_deprecated("DeepSeekV2Provider", "DeepSeekV2ModelProvider")
+        super().__post_init__()
+
+
+@dataclass
+class DeepSeekV2LiteProvider(DeepSeekV2LiteModelProvider):
+    """Deprecated alias for ``DeepSeekV2LiteModelProvider``.
+
+    Deprecated:
+        This alias remains for backward compatibility and will be removed in a
+        future release. Import and use ``DeepSeekV2LiteModelProvider`` instead.
+    """
+
+    def __post_init__(self) -> None:
+        _warn_deprecated("DeepSeekV2LiteProvider", "DeepSeekV2LiteModelProvider")
+        super().__post_init__()
+
+
+@dataclass
+class DeepSeekV3Provider(DeepSeekV3ModelProvider):
+    """Deprecated alias for ``DeepSeekV3ModelProvider``.
+
+    Deprecated:
+        This alias remains for backward compatibility and will be removed in a
+        future release. Import and use ``DeepSeekV3ModelProvider`` instead.
+    """
+
+    def __post_init__(self) -> None:
+        _warn_deprecated("DeepSeekV3Provider", "DeepSeekV3ModelProvider")
+        super().__post_init__()
+
+
+@dataclass
+class MoonlightProvider(MoonlightModelProvider16B):
+    """Deprecated alias for ``MoonlightModelProvider16B``.
+
+    Deprecated:
+        This alias remains for backward compatibility and will be removed in a
+        future release. Import and use ``MoonlightModelProvider16B`` instead.
+    """
+
+    def __post_init__(self) -> None:
+        _warn_deprecated("MoonlightProvider", "MoonlightModelProvider16B")
+        super().__post_init__()

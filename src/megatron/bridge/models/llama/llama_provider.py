@@ -54,6 +54,7 @@ class LlamaModelProvider(GPTModelProvider):
     masked_softmax_fusion: bool = field(default_factory=fusions.can_enable_masked_softmax_fusion)
     bias_dropout_fusion: bool = field(default_factory=fusions.can_enable_bias_dropout_fusion)
     apply_rope_fusion: bool = field(default_factory=fusions.can_enable_apply_rope_fusion)
+    gradient_accumulation_fusion: bool = field(default_factory=fusions.can_enable_gradient_accumulation_fusion)
     use_transformer_engine_op_fuser: Optional[bool] = None
 
 
@@ -144,7 +145,7 @@ class Llama31ModelProvider(Llama3ModelProvider):
     old_context_len: int = 8192
     init_method_std: float = 0.02
 
-    def provide(self, pre_process=None, post_process=None, vp_stage=None, tokenizer=None) -> "MCoreGPTModel":
+    def provide(self, pre_process=None, post_process=None, vp_stage=None) -> "MCoreGPTModel":
         """Configure and instantiate a Megatron Core Llama 3.1 model.
 
         Extends the base configuration with Llama 3.1 specific RoPE scaling.
@@ -153,14 +154,11 @@ class Llama31ModelProvider(Llama3ModelProvider):
             pre_process: Whether to include pre-processing in the model
             post_process: Whether to include post-processing in the model
             vp_stage: Virtual pipeline stage
-            tokenizer: Tokenizer used with the model
 
         Returns:
             MCoreGPTModel: Configured Megatron Core GPT model instance
         """
-        model = super().provide(
-            pre_process=pre_process, post_process=post_process, vp_stage=vp_stage, tokenizer=tokenizer
-        )
+        model = super().provide(pre_process=pre_process, post_process=post_process, vp_stage=vp_stage)
         # Apply rope scaling for Llama3.1 model
         model.rotary_pos_emb.inv_freq = apply_rope_scaling(
             model.rotary_pos_emb.inv_freq,
@@ -186,6 +184,7 @@ class Llama3ModelProvider8B(Llama3ModelProvider):
     hidden_size: int = 4096
     ffn_hidden_size: int = 14336
     num_attention_heads: int = 32
+    cross_entropy_fusion_impl: str = "te"
 
 
 @dataclass
@@ -204,6 +203,7 @@ class Llama3ModelProvider70B(Llama3ModelProvider):
     num_attention_heads: int = 64
     init_method_std: float = 0.008944
     make_vocab_size_divisible_by: int = 128
+    cross_entropy_fusion_impl: str = "te"
 
 
 @dataclass
@@ -257,6 +257,7 @@ class Llama31ModelProvider405B(Llama31ModelProvider):
     ffn_hidden_size: int = 53248
     num_attention_heads: int = 128
     make_vocab_size_divisible_by: int = 128
+    cross_entropy_fusion_impl: str = "te"
 
 
 @dataclass

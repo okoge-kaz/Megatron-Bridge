@@ -249,7 +249,7 @@ class TestPretrainConfig:
         assert config.scheduler.lr_decay_style == "cosine"
         assert config.scheduler.lr_warmup_iters == 2000
         assert config.scheduler.lr_warmup_init == 0.0
-        assert config.scheduler.lr_decay_iters == 50000  # Should match train_iters
+        assert config.scheduler.lr_decay_iters is None  # Will be set to train_iters during validation
         assert config.scheduler.override_opt_param_scheduler is True
 
     def test_pretrain_config_tokenizer_configuration(self):
@@ -276,7 +276,7 @@ class TestPretrainConfig:
         assert config.dataset.num_dataset_builder_threads == 1
         assert config.dataset.data_sharding is True
         assert config.dataset.dataloader_type == "single"
-        assert config.dataset.num_workers == 1
+        assert config.dataset.num_workers == 8
 
     def test_pretrain_config_logger_configuration(self):
         """Test logger configuration."""
@@ -312,7 +312,7 @@ class TestPretrainConfig:
         # Sequence length should still be 16k
         assert config.dataset.sequence_length == SEQUENCE_LENGTH_16K
 
-    @pytest.mark.parametrize("precision", ["fp16_mixed", "bf16_with_fp8_mixed"])
+    @pytest.mark.parametrize("precision", ["fp16_mixed", "bf16_with_fp8_delayed_scaling_mixed"])
     def test_precision_recipes(self, precision):
         cfg = pretrain_config(precision_config=precision)
         assert cfg.mixed_precision == precision

@@ -643,6 +643,7 @@ class TestLoRAMegatronIntegration:
         # Register LoRA pre-wrap hook
         lora_hook = self._create_lora_pre_wrap_hook(lora)
         model_provider.register_pre_wrap_hook(lora_hook)
+        model_provider.finalize()
 
         # Get the model with LoRA applied via hook
         adapted_model = model_provider.provide_distributed_model(ddp_config=None, wrap_with_ddp=False)
@@ -686,7 +687,7 @@ class TestLoRAMegatronIntegration:
             num_layers=1,
             hidden_size=64,
             num_attention_heads=2,
-            vocab_size=100,
+            vocab_size=128,
             ffn_hidden_size=128,
         )
 
@@ -694,6 +695,7 @@ class TestLoRAMegatronIntegration:
         lora = LoRA(dim=4, alpha=8)
         lora_hook = self._create_lora_pre_wrap_hook(lora)
         model_provider.register_pre_wrap_hook(lora_hook)
+        model_provider.finalize()
 
         # Get and adapt model using hook
         adapted_model = model_provider.provide_distributed_model(ddp_config=None, wrap_with_ddp=False)
@@ -754,6 +756,7 @@ class TestLoRAMegatronIntegration:
         lora = LoRA(dim=4, alpha=8)
         lora_hook = self._create_lora_pre_wrap_hook(lora)
         model_provider.register_pre_wrap_hook(lora_hook)
+        model_provider.finalize()
 
         # Get LoRA-adapted model using hook
         adapted_model = model_provider.provide_distributed_model(ddp_config=None, wrap_with_ddp=False)
@@ -826,6 +829,7 @@ class TestLoRAMegatronIntegration:
             lora = LoRA(target_modules=targets, dim=4, alpha=8)
             lora_hook = self._create_lora_pre_wrap_hook(lora)
             model_provider.register_pre_wrap_hook(lora_hook)
+            model_provider.finalize()
 
             # Get adapted model using hook
             adapted_model = model_provider.provide_distributed_model(ddp_config=None, wrap_with_ddp=False)
@@ -856,6 +860,7 @@ class TestLoRAMegatronIntegration:
         # Register hook and apply LoRA first time
         lora_hook = self._create_lora_pre_wrap_hook(lora)
         model_provider.register_pre_wrap_hook(lora_hook)
+        model_provider.finalize()
         first_transform = model_provider.provide_distributed_model(ddp_config=None, wrap_with_ddp=False)
 
         first_transform = [chunk.cuda() for chunk in first_transform]

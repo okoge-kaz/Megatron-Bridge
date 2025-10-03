@@ -17,8 +17,6 @@ from dataclasses import dataclass
 
 import pytest
 import torch
-from megatron.core.distributed import DistributedDataParallelConfig
-from megatron.core.optimizer import OptimizerConfig
 
 from megatron.bridge.data.builders.hf_dataset import HFDatasetConfig
 from megatron.bridge.data.datasets.packed_sequence import PackedSequenceSpecs
@@ -28,8 +26,10 @@ from megatron.bridge.peft.lora import LoRA
 from megatron.bridge.training.config import (
     CheckpointConfig,
     ConfigContainer,
+    DistributedDataParallelConfig,
     LoggerConfig,
     MockGPTDatasetConfig,
+    OptimizerConfig,
     RNGConfig,
     SchedulerConfig,
     TokenizerConfig,
@@ -55,6 +55,7 @@ class Llama3ModelProvider145M(Llama3ModelProvider):
     ffn_hidden_size: int = 2688
     num_attention_heads: int = 16
     make_vocab_size_divisible_by: int = 128
+    vocab_size: int | None = 128256
 
 
 class TestLoRAFinetune:

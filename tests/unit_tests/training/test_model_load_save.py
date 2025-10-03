@@ -211,11 +211,11 @@ class TestLoadMegatronModel:
         mock_run_config.return_value = mock_run_cfg_dict
 
         mock_model = Mock()
-        mock_model_cfg = Mock()
+        mock_model_cfg = Mock(spec=ModelProviderMixin)
         mock_model_cfg.params_dtype = torch.float32
         mock_model_cfg.bf16 = True
         mock_model_cfg.fp16 = False
-        mock_model_cfg.provide.return_value = mock_model
+        mock_model_cfg.provide_distributed_model.return_value = [mock_model]
         mock_model_cfg.use_cpu_initialization = False
 
         mock_instantiate.return_value = mock_model_cfg
@@ -233,30 +233,36 @@ class TestLoadMegatronModel:
         mock_run_config.assert_called_once()
         mock_instantiate.assert_called_once_with(mock_run_cfg_dict["model"])
         mock_cpu_context.assert_called_once()
-        mock_model_cfg.provide.assert_called_once()
+        mock_model_cfg.provide_distributed_model.assert_called_once()
         mock_load_weights.assert_called_once_with(ckpt_path, [mock_model], return_state_dict=True)
         assert mock_model_cfg.params_dtype == torch.bfloat16
 
         result = load_megatron_model(ckpt_path, return_state_dict=False, use_cpu_init=True)
-        assert result == mock_model
+        assert result == [mock_model]
         mock_load_weights.assert_called_with(ckpt_path, [mock_model], return_state_dict=False)
 
     @pytest.mark.parametrize("model_type", ["gpt", "mamba", "resnet"])
     @patch("megatron.bridge.training.model_load_save.temporary_distributed_context")
     @patch("megatron.bridge.training.mlm_compat.model._mamba_provider")
     @patch("megatron.bridge.training.mlm_compat.model._gpt_provider")
+    @patch("megatron.bridge.training.mlm_compat.model._get_model")
     @patch("megatron.bridge.training.checkpointing._load_model_weights_from_checkpoint")
     @patch("megatron.bridge.training.mlm_compat.arguments._transformer_config_from_args")
     @patch("megatron.bridge.training.mlm_compat.arguments._load_args_from_checkpoint")
+    @patch("megatron.bridge.training.model_load_save.build_tokenizer")
+    @patch("megatron.bridge.training.mlm_compat.arguments._tokenizer_config_from_args")
     @patch("megatron.bridge.training.model_load_save.megatron_cpu_init_context")
     @patch("megatron.bridge.training.model_load_save.dist")
     def test_load_mlm_saved_model(
         self,
         mock_dist,
         mock_cpu_context,
+        mock_tokenizer_config_from_args,
+        mock_build_tokenizer,
         mock_load_args,
         mock_transformer_cfg,
         mock_load_weights,
+        mock_get_model,
         mock_gpt_provider,
         mock_mamba_provider,
         mock_temp_dist,
@@ -268,7 +274,18 @@ class TestLoadMegatronModel:
 
         ckpt_path = "/path/to/mock/dist_checkpoint"
         mock_args = Mock()
+        mock_args.vocab_size = 32000  # Add vocab_size for padded vocab calculation
+        mock_args.make_vocab_size_divisible_by = 128  # Add for padded vocab calculation
+        mock_args.tensor_model_parallel_size = 1  # Add for padded vocab calculation
         mock_load_args.return_value = mock_args
+
+        # Setup tokenizer mocks for MLM compat path
+        mock_tokenizer_cfg = Mock()
+        mock_tokenizer_config_from_args.return_value = mock_tokenizer_cfg
+
+        mock_tokenizer = Mock()
+        mock_tokenizer.vocab_size = 32000  # Unpadded vocab size for calculate_padded_vocab_size
+        mock_build_tokenizer.return_value = mock_tokenizer
 
         mock_model = Mock()
         mock_model_cfg = Mock()
@@ -276,13 +293,14 @@ class TestLoadMegatronModel:
         mock_model_cfg.bf16 = True
         mock_model_cfg.fp16 = False
         mock_model_cfg.use_cpu_initialization = False
+        mock_model_cfg.make_vocab_size_divisible_by = 128  # Add for padded vocab calculation
+        mock_model_cfg.tensor_model_parallel_size = 1  # Add for padded vocab calculation
         mock_provider = None
         if model_type == "gpt":
             mock_provider = mock_gpt_provider
-            mock_provider.return_value = mock_model
         elif model_type == "mamba":
             mock_provider = mock_mamba_provider
-            mock_provider.return_value = mock_model
+        mock_get_model.return_value = [mock_model]
 
         mock_transformer_cfg.return_value = mock_model_cfg
         expected_result = {"layer.weight": torch.randn(2, 2)}
@@ -295,13 +313,17 @@ class TestLoadMegatronModel:
             assert result == expected_result
             mock_load_args.assert_called_once_with(ckpt_path)
             mock_transformer_cfg.assert_called_once_with(mock_args)
+            mock_tokenizer_config_from_args.assert_called_once_with(mock_args)
+            mock_build_tokenizer.assert_called_once_with(mock_tokenizer_cfg)
+            # Verify padded vocab size was calculated and set
+            assert mock_args.padded_vocab_size == 32000  # 32000 is already divisible by 128, so no padding
             mock_cpu_context.assert_called_once()
-            mock_provider.assert_called_once_with(mock_args, mock_model_cfg)
+            mock_get_model.assert_called_once_with(mock_args, mock_provider, mock_model_cfg)
             mock_load_weights.assert_called_once_with(ckpt_path, [mock_model], return_state_dict=True)
             assert mock_model_cfg.params_dtype == torch.bfloat16
 
             result = load_megatron_model(ckpt_path, model_type=model_type, return_state_dict=False, use_cpu_init=True)
-            assert result == mock_model
+            assert result == [mock_model]
             mock_load_weights.assert_called_with(ckpt_path, [mock_model], return_state_dict=False)
         else:
             with pytest.raises(AssertionError, match=f"model type {model_type} not supported."):
@@ -334,11 +356,11 @@ class TestLoadMegatronModel:
         mock_run_config.return_value = mock_run_cfg_dict
 
         mock_model = Mock()
-        mock_model_cfg = Mock()
+        mock_model_cfg = Mock(spec=ModelProviderMixin)
         mock_model_cfg.params_dtype = torch.bfloat16
         mock_model_cfg.bf16 = True
         mock_model_cfg.fp16 = False
-        mock_model_cfg.provide.return_value = mock_model
+        mock_model_cfg.provide_distributed_model.return_value = mock_model
         mock_model_cfg.use_cpu_initialization = False
 
         mock_instantiate.return_value = mock_model_cfg
@@ -350,6 +372,75 @@ class TestLoadMegatronModel:
 
         assert result == mock_model
         mock_temp_dist.assert_not_called()
+
+    @patch("megatron.bridge.training.model_load_save.build_and_load_model")
+    @patch("megatron.bridge.training.model_load_save.load_model_config")
+    def test_load_megatron_model_resets_defaults(self, mock_load_model_config, mock_build_and_load):
+        """Verify single-GPU default resets are applied before building the model."""
+        # Prepare a config object with non-default values that should be reset
+        cfg = Mock()
+        cfg.tensor_model_parallel_size = 8
+        cfg.pipeline_model_parallel_size = 4
+        cfg.context_parallel_size = 2
+        cfg.expert_model_parallel_size = 2
+        cfg.expert_tensor_parallel_size = 2
+        cfg.moe_extended_tp = True
+        cfg.sequence_parallel = True
+        cfg.virtual_pipeline_model_parallel_size = 2
+        cfg.hierarchical_context_parallel_sizes = [2, 2]
+
+        mock_load_model_config.return_value = (cfg, None)
+        sentinel = object()
+        mock_build_and_load.return_value = sentinel
+
+        result = load_megatron_model("/ckpt", model_type=None, return_state_dict=False, use_cpu_init=True)
+
+        # Ensure build_and_load_model was called and returned
+        assert result is sentinel
+
+        # After resets (no overrides), the following should hold
+        assert cfg.tensor_model_parallel_size == 1
+        assert cfg.pipeline_model_parallel_size == 1
+        assert cfg.context_parallel_size == 1
+        assert cfg.expert_model_parallel_size == 1
+        assert cfg.expert_tensor_parallel_size == 1
+        assert cfg.moe_extended_tp is False
+        assert cfg.sequence_parallel is False
+        assert cfg.virtual_pipeline_model_parallel_size is None
+        assert cfg.hierarchical_context_parallel_sizes is None
+
+    @patch("megatron.bridge.training.model_load_save.build_and_load_model")
+    @patch("megatron.bridge.training.model_load_save.load_model_config")
+    def test_load_megatron_model_applies_overrides(self, mock_load_model_config, mock_build_and_load):
+        """Verify mp_overrides entries are applied to the config."""
+        cfg = Mock()
+        # Start with defaults to make verification straightforward
+        cfg.tensor_model_parallel_size = 1
+        cfg.pipeline_model_parallel_size = 1
+        cfg.context_parallel_size = 1
+        cfg.expert_model_parallel_size = 1
+        cfg.expert_tensor_parallel_size = 1
+        cfg.moe_extended_tp = False
+        cfg.sequence_parallel = False
+        cfg.virtual_pipeline_model_parallel_size = None
+        cfg.hierarchical_context_parallel_sizes = None
+
+        mock_load_model_config.return_value = (cfg, None)
+        mock_build_and_load.return_value = Mock()
+
+        overrides = {
+            "tensor_model_parallel_size": 2,
+            "pipeline_model_parallel_size": 3,
+            "sequence_parallel": True,
+            "virtual_pipeline_model_parallel_size": 4,
+        }
+
+        _ = load_megatron_model("/ckpt", mp_overrides=overrides)
+
+        assert cfg.tensor_model_parallel_size == 2
+        assert cfg.pipeline_model_parallel_size == 3
+        assert cfg.sequence_parallel is True
+        assert cfg.virtual_pipeline_model_parallel_size == 4
 
 
 class TestSaveMegatronModel:
@@ -393,6 +484,125 @@ class TestSaveMegatronModel:
         # Assertions
         mock_get_model_config.assert_called_once_with(mock_model)
         mock_global_state.assert_called_once()
+        mock_save_checkpoint.assert_called_once_with(
+            state=mock_state,
+            model=[mock_model],
+            optimizer=None,
+            opt_param_scheduler=None,
+            num_floating_point_operations_so_far=0,
+        )
+
+    @patch("megatron.bridge.training.model_load_save.save_checkpoint")
+    @patch("megatron.bridge.training.model_load_save.get_model_config")
+    @patch("megatron.bridge.training.model_load_save.GlobalState")
+    @patch("megatron.bridge.training.model_load_save.ConfigContainer")
+    @patch("megatron.bridge.training.model_load_save.OptimizerConfig")
+    @patch("megatron.bridge.training.model_load_save.LoggerConfig")
+    @patch("megatron.bridge.training.model_load_save.CheckpointConfig")
+    def test_save_megatron_model_with_tokenizer(
+        self,
+        mock_ckpt_config,
+        mock_logger_config,
+        mock_opt_config,
+        mock_config_container,
+        mock_global_state,
+        mock_get_model_config,
+        mock_save_checkpoint,
+    ):
+        """Test saving megatron model with tokenizer configuration."""
+        # Setup mocks
+        mock_model = Mock()
+
+        class MockModelConfig(ModelProviderMixin, Mock):
+            def provide(self, pre_process=None, post_process=None, vp_stage=None):
+                return Mock()
+
+        mock_model_config = MockModelConfig()
+        mock_get_model_config.return_value = mock_model_config
+
+        mock_state = Mock()
+        mock_global_state.return_value = mock_state
+
+        # Mock the ConfigContainer to capture tokenizer config
+        mock_container_instance = Mock()
+        mock_config_container.return_value = mock_container_instance
+
+        # Test with tokenizer path
+        with tempfile.TemporaryDirectory() as temp_dir:
+            save_megatron_model(
+                [mock_model], temp_dir, ckpt_format="torch_dist", hf_tokenizer_path="meta-llama/Llama-3-8B"
+            )
+
+        # Assertions
+        mock_get_model_config.assert_called_once_with(mock_model)
+        mock_global_state.assert_called_once()
+
+        # Check that ConfigContainer was called with a tokenizer config
+        mock_config_container.assert_called_once()
+        call_kwargs = mock_config_container.call_args[1]
+        assert "tokenizer" in call_kwargs
+        tokenizer_config = call_kwargs["tokenizer"]
+        assert tokenizer_config.tokenizer_type == "HuggingFaceTokenizer"
+        assert tokenizer_config.tokenizer_model == "meta-llama/Llama-3-8B"
+        assert tokenizer_config.vocab_size is None
+
+        mock_save_checkpoint.assert_called_once_with(
+            state=mock_state,
+            model=[mock_model],
+            optimizer=None,
+            opt_param_scheduler=None,
+            num_floating_point_operations_so_far=0,
+        )
+
+    @patch("megatron.bridge.training.model_load_save.save_checkpoint")
+    @patch("megatron.bridge.training.model_load_save.get_model_config")
+    @patch("megatron.bridge.training.model_load_save.GlobalState")
+    @patch("megatron.bridge.training.model_load_save.ConfigContainer")
+    @patch("megatron.bridge.training.model_load_save.OptimizerConfig")
+    @patch("megatron.bridge.training.model_load_save.LoggerConfig")
+    @patch("megatron.bridge.training.model_load_save.CheckpointConfig")
+    def test_save_megatron_model_without_tokenizer(
+        self,
+        mock_ckpt_config,
+        mock_logger_config,
+        mock_opt_config,
+        mock_config_container,
+        mock_global_state,
+        mock_get_model_config,
+        mock_save_checkpoint,
+    ):
+        """Test saving megatron model without tokenizer configuration."""
+        # Setup mocks
+        mock_model = Mock()
+
+        class MockModelConfig(ModelProviderMixin, Mock):
+            def provide(self, pre_process=None, post_process=None, vp_stage=None):
+                return Mock()
+
+        mock_model_config = MockModelConfig()
+        mock_get_model_config.return_value = mock_model_config
+
+        mock_state = Mock()
+        mock_global_state.return_value = mock_state
+
+        # Mock the ConfigContainer to capture tokenizer config
+        mock_container_instance = Mock()
+        mock_config_container.return_value = mock_container_instance
+
+        # Test without tokenizer path (should be None)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            save_megatron_model([mock_model], temp_dir, ckpt_format="torch_dist", hf_tokenizer_path=None)
+
+        # Assertions
+        mock_get_model_config.assert_called_once_with(mock_model)
+        mock_global_state.assert_called_once()
+
+        # Check that ConfigContainer was called with tokenizer=None
+        mock_config_container.assert_called_once()
+        call_kwargs = mock_config_container.call_args[1]
+        assert "tokenizer" in call_kwargs
+        assert call_kwargs["tokenizer"] is None
+
         mock_save_checkpoint.assert_called_once_with(
             state=mock_state,
             model=[mock_model],
@@ -511,7 +721,7 @@ class TestLoadTokenizer:
         assert result == mock_tokenizer
         mock_read_cfg.assert_called_once()
         mock_instantiate.assert_called_once_with({})
-        mock_build_tokenizer.assert_called_once_with(mock_tokenizer_cfg, 128, 1)
+        mock_build_tokenizer.assert_called_once_with(mock_tokenizer_cfg)
 
     @patch("megatron.bridge.training.model_load_save.build_tokenizer")
     @patch("megatron.bridge.training.mlm_compat.arguments._tokenizer_config_from_args")
@@ -537,4 +747,4 @@ class TestLoadTokenizer:
         assert result == mock_tokenizer
         mock_load_args.assert_called_once_with(ckpt_path)
         mock_cfg_from_args.assert_called_once_with(mock_args)
-        mock_build_tokenizer.assert_called_once_with(mock_tokenizer_cfg, 256, 2)
+        mock_build_tokenizer.assert_called_once_with(mock_tokenizer_cfg)

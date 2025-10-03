@@ -16,7 +16,6 @@ import os
 from typing import List, Optional, Union
 
 import torch
-from megatron.core.distributed import DistributedDataParallelConfig
 
 from megatron.bridge.models.qwen import Qwen3MoEModelProvider235B_A22B
 from megatron.bridge.recipes.utils.dataset_utils import get_blend_fields_from_data_paths
@@ -25,13 +24,14 @@ from megatron.bridge.training.comm_overlap import CommOverlapConfig
 from megatron.bridge.training.config import (
     CheckpointConfig,
     ConfigContainer,
+    DistributedDataParallelConfig,
     GPTDatasetConfig,
     LoggerConfig,
     RNGConfig,
     TokenizerConfig,
     TrainingConfig,
 )
-from megatron.bridge.training.mixed_precision import MixedPrecisionConfig
+from megatron.bridge.training.mixed_precision import MixedPrecisionConfig, bf16_mixed
 
 
 def model_config(
@@ -65,6 +65,7 @@ def model_config(
         virtual_pipeline_model_parallel_size=virtual_pipeline_parallelism,
         context_parallel_size=context_parallelism,
         expert_model_parallel_size=expert_parallelism,
+        expert_tensor_parallel_size=1,
         sequence_parallel=sequence_parallelism,
         account_for_embedding_in_pipeline_split=True,
         account_for_loss_in_pipeline_split=True,
@@ -92,6 +93,7 @@ def pretrain_config(
     context_parallelism: int = 2,
     expert_parallelism: Optional[int] = 8,
     sequence_parallelism: bool = True,
+    use_megatron_fsdp: bool = False,
     # Training hyperparameters
     train_iters: int = 300000,
     global_batch_size: int = 32,
@@ -100,8 +102,9 @@ def pretrain_config(
     lr: float = 3e-4,
     min_lr: float = 3e-5,
     lr_warmup_iters: int = 500,
+    lr_decay_iters: Optional[int] = None,
     # Precision recipe
-    precision_config: Optional[Union[MixedPrecisionConfig, str]] = "bf16_mixed",
+    precision_config: Optional[Union[MixedPrecisionConfig, str]] = None,
     comm_overlap_config: Optional[CommOverlapConfig] = None,
 ) -> ConfigContainer:
     """
@@ -124,6 +127,7 @@ def pretrain_config(
         context_parallelism (int): Degree of context parallelism to be passed to model_config.
         expert_parallelism (Optional[int]): Degree of expert parallelism for MoE.
         sequence_parallelism (bool): Whether to use sequence parallelism.
+        use_megatron_fsdp (bool): Whether to use Megatron FSDP.
         train_iters (int): Total number of training iterations.
         global_batch_size (int): Global batch size for training.
         micro_batch_size (int): Micro batch size for training.
@@ -131,6 +135,7 @@ def pretrain_config(
         lr (float): Learning rate.
         min_lr (float): Minimum learning rate for cosine decay.
         lr_warmup_iters (int): Number of warmup iterations for the learning rate.
+        lr_decay_iters (Optional[int]): Number of iterations for learning rate decay.
         precision_config (Optional[Union[MixedPrecisionConfig, str]]): Precision configuration for the model.
 
     Returns:
@@ -158,10 +163,15 @@ def pretrain_config(
 
     opt_config, scheduler = distributed_fused_adam_with_cosine_annealing(
         lr_warmup_iters=lr_warmup_iters,
-        lr_decay_iters=train_iters,
+        lr_decay_iters=lr_decay_iters,
         max_lr=lr,
         min_lr=min_lr,
     )
+
+    if precision_config is None:
+        precision_config = bf16_mixed()
+    if isinstance(precision_config, MixedPrecisionConfig):
+        precision_config.grad_reduce_in_fp32 = False
 
     # Config Container
     cfg = ConfigContainer(
@@ -183,9 +193,10 @@ def pretrain_config(
             grad_reduce_in_fp32=True,
             overlap_grad_reduce=True,
             overlap_param_gather=True,
-            average_in_collective=True,  # Not supported for custom FSDP for now, need to be set to False if using FSDP
-            data_parallel_sharding_strategy="optim_grads_params",  # For custom FSDP only
+            average_in_collective=True,  # Not supported for Megatron FSDP for now, need to be set to False if using Megatron FSDP
+            data_parallel_sharding_strategy="optim_grads_params",  # For Megatron FSDP only
             use_distributed_optimizer=True,
+            use_megatron_fsdp=use_megatron_fsdp,  # need use_distributed_optimizer=True
         ),
         dataset=GPTDatasetConfig(
             random_seed=1234,
@@ -200,6 +211,7 @@ def pretrain_config(
             # Dataloader config parameters
             data_sharding=True,
             dataloader_type="single",
+            skip_getting_attention_mask_from_dataset=True,
         ),
         logger=LoggerConfig(
             log_interval=10,

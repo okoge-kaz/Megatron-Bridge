@@ -16,9 +16,8 @@ import os
 from typing import List, Optional, Union
 
 import torch
-from megatron.core.distributed import DistributedDataParallelConfig
 
-from megatron.bridge.models.deepseek import DeepSeekV2LiteProvider
+from megatron.bridge.models.deepseek import DeepSeekV2LiteModelProvider
 from megatron.bridge.recipes.utils.dataset_utils import get_blend_fields_from_data_paths
 from megatron.bridge.recipes.utils.optimizer_utils import distributed_fused_adam_with_cosine_annealing
 from megatron.bridge.recipes.utils.tokenizer_utils import DEFAULT_NULL_TOKENIZER_VOCAB_SIZE
@@ -26,6 +25,7 @@ from megatron.bridge.training.comm_overlap import CommOverlapConfig
 from megatron.bridge.training.config import (
     CheckpointConfig,
     ConfigContainer,
+    DistributedDataParallelConfig,
     GPTDatasetConfig,
     LoggerConfig,
     RNGConfig,
@@ -46,7 +46,7 @@ def model_config(
     recompute_granularity: str = "full",
     recompute_method: str = "uniform",
     recompute_num_layers: int = 1,
-) -> DeepSeekV2LiteProvider:
+) -> DeepSeekV2LiteModelProvider:
     """
     Configure the DeepSeek-V2-Lite (16B) model.
 
@@ -63,9 +63,9 @@ def model_config(
         recompute_num_layers (int): Number of layers to recompute.
 
     Returns:
-        DeepSeekV2LiteProvider: Configuration for the DeepSeek-V2-Lite model.
+        DeepSeekV2LiteModelProvider: Configuration for the DeepSeek-V2-Lite model.
     """
-    return DeepSeekV2LiteProvider(
+    return DeepSeekV2LiteModelProvider(
         tensor_model_parallel_size=tensor_parallelism,
         pipeline_model_parallel_size=pipeline_parallelism,
         pipeline_dtype=pipeline_parallelism_dtype,
@@ -98,6 +98,7 @@ def pretrain_config(
     context_parallelism: int = 1,
     expert_parallelism: int = 8,
     sequence_parallelism: bool = False,
+    use_megatron_fsdp: bool = False,
     # Training hyperparameters
     train_iters: int = 1_000_000,
     global_batch_size: int = 512,
@@ -106,6 +107,7 @@ def pretrain_config(
     lr: float = 3e-4,
     min_lr: float = 3e-5,
     lr_warmup_iters: int = 2000,
+    lr_decay_iters: Optional[int] = None,
     # Precision recipe
     precision_config: Optional[Union[MixedPrecisionConfig, str]] = "bf16_mixed",
     comm_overlap_config: Optional[CommOverlapConfig] = None,
@@ -173,7 +175,7 @@ def pretrain_config(
 
     opt_config, scheduler = distributed_fused_adam_with_cosine_annealing(
         lr_warmup_iters=lr_warmup_iters,
-        lr_decay_iters=train_iters,
+        lr_decay_iters=lr_decay_iters,
         adam_beta1=0.9,
         adam_beta2=0.95,
         adam_eps=1e-5,
@@ -204,6 +206,7 @@ def pretrain_config(
             overlap_param_gather=True,
             average_in_collective=True,
             use_distributed_optimizer=True,
+            use_megatron_fsdp=use_megatron_fsdp,  # need use_distributed_optimizer=True
         ),
         dataset=GPTDatasetConfig(
             random_seed=1234,
@@ -218,7 +221,8 @@ def pretrain_config(
             # Dataloader config parameters
             data_sharding=True,
             dataloader_type="single",
-            num_workers=1,
+            num_workers=8,
+            skip_getting_attention_mask_from_dataset=True,
         ),
         logger=LoggerConfig(log_interval=10, tensorboard_dir=tensorboard_dir, log_timers_to_tensorboard=True),
         tokenizer=TokenizerConfig(tokenizer_type="NullTokenizer", vocab_size=DEFAULT_NULL_TOKENIZER_VOCAB_SIZE),
