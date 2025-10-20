@@ -2,9 +2,9 @@
 
 set -e
 
-ITERATIONS=(7800)
+ITERATIONS=(23000)
 
-upload_base_dir=/groups/gch51639/fujii/checkpoints/megatron-to-hf/Qwen3-Swallow-8B-BF16/tp2-pp1-ct1/LR1.50E-5-MINLR1.50E-6-WD0.1
+upload_base_dir=/groups/gag51395/checkpoints/megatron-to-hf/Qwen3-Swallow-8B-v0.1-SFT/swallow-reasoning/exp8
 
 upload_checkpoint() {
   local upload_dir=$1
@@ -32,7 +32,7 @@ upload_checkpoint() {
 for ITERATION in "${ITERATIONS[@]}"; do
   FORMATTED_ITERATION="$(printf "%07d" "${ITERATION}")"
   upload_dir=$upload_base_dir/iteration_${FORMATTED_ITERATION}
-  repo_name="tokyotech-llm/Qwen3-Swallow-8B-v0.1-BF16-LR1.5E-5-iter${FORMATTED_ITERATION}"
+  repo_name="tokyotech-llm/Qwen3-Swallow-8B-v0.1-SFT-exp8-LR1.5E-5-iter${FORMATTED_ITERATION}"
 
   if ! upload_checkpoint "$upload_dir" "$repo_name"; then
     echo "Skipping to next checkpoint after repeated failures for $repo_name"
