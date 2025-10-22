@@ -4,7 +4,7 @@ set -e
 
 ITERATIONS=(1000 2000 2500 3000 4000 5000 6000 7000 7500 8000 9000 10000 11000 12000 12500)
 
-upload_base_dir=/groups/gch51639/fujii/checkpoints/megatron-to-hf/Llama-3.1-8B/swallow-code/exp20
+upload_base_dir=/groups/gch51639/fujii/checkpoints/megatron-to-hf/Llama-3.1-8b/swallow-math/exp14
 
 upload_checkpoint() {
   local upload_dir=$1
@@ -32,7 +32,7 @@ upload_checkpoint() {
 for ITERATION in "${ITERATIONS[@]}"; do
   FORMATTED_ITERATION="$(printf "%07d" "${ITERATION}")"
   upload_dir=$upload_base_dir/iteration_${FORMATTED_ITERATION}
-  repo_name="tokyotech-llm/Llama-3.1-8B-swallow-code-v2-exp20-iter${FORMATTED_ITERATION}"
+  repo_name="tokyotech-llm/Llama-3.1-8B-swallow-math-v2-exp14-iter${FORMATTED_ITERATION}"
 
   if ! upload_checkpoint "$upload_dir" "$repo_name"; then
     echo "Skipping to next checkpoint after repeated failures for $repo_name"
