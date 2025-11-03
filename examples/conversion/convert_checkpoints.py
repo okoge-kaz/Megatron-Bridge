@@ -88,6 +88,7 @@ def import_hf_to_megatron(
     torch_dtype: Optional[str] = None,
     device_map: Optional[str] = None,
     trust_remote_code: bool = False,
+    iteration: Optional[int] = None,
 ) -> None:
     """
     Import a HuggingFace model and save it as a Megatron checkpoint.
@@ -120,6 +121,7 @@ def import_hf_to_megatron(
     AutoBridge.import_ckpt(
         hf_model_id=hf_model,
         megatron_path=megatron_path,
+        iteration=iteration,
         **kwargs,
     )
 
@@ -141,6 +143,7 @@ def export_megatron_to_hf(
     megatron_path: str,
     hf_path: str,
     show_progress: bool = True,
+    model_type: Optional[str] = None,
 ) -> None:
     """
     Export a Megatron checkpoint to HuggingFace format.
@@ -167,11 +170,9 @@ def export_megatron_to_hf(
             config_files = list(latest_iter.glob("run_config.yaml"))
 
     if not config_files:
-        raise FileNotFoundError(
-            f"Could not find run_config.yaml in {checkpoint_path}. Please ensure this is a valid Megatron checkpoint."
-        )
-
-    print(f"📋 Found configuration: {config_files[0]}")
+        print("⚠️ Warning: No run_config.yaml found. Proceeding without model config.")
+    else:
+        print(f"📋 Found configuration: {config_files[0]}")
 
     # For demonstration, we'll create a bridge from a known config
     # This would typically be extracted from the checkpoint metadata
@@ -183,6 +184,7 @@ def export_megatron_to_hf(
         megatron_path=megatron_path,
         hf_path=hf_path,
         show_progress=show_progress,
+        model_type=model_type,
     )
 
     print(f"✅ Successfully exported model to: {hf_path}")
@@ -221,6 +223,7 @@ def main():
     import_parser.add_argument("--torch-dtype", choices=["float32", "float16", "bfloat16"], help="Model precision")
     import_parser.add_argument("--device-map", help='Device placement strategy (e.g., "auto", "cuda:0")')
     import_parser.add_argument("--trust-remote-code", action="store_true", help="Allow custom model code execution")
+    import_parser.add_argument("--iteration", type=int, help="Specific checkpoint iteration to load", default=None)
 
     # Export subcommand (Megatron -> HF)
     export_parser = subparsers.add_parser("export", help="Export Megatron checkpoint to HuggingFace format")
@@ -232,6 +235,7 @@ def main():
         "--hf-path", required=True, help="Directory path where the HuggingFace model will be saved"
     )
     export_parser.add_argument("--no-progress", action="store_true", help="Disable progress bar during export")
+    export_parser.add_argument("--model-type", choices=["gpt", "mamba"])
 
     args = parser.parse_args()
 
@@ -246,6 +250,7 @@ def main():
             torch_dtype=args.torch_dtype,
             device_map=args.device_map,
             trust_remote_code=args.trust_remote_code,
+            iteration=args.iteration,
         )
 
     elif args.command == "export":
@@ -254,6 +259,7 @@ def main():
             megatron_path=args.megatron_path,
             hf_path=args.hf_path,
             show_progress=not args.no_progress,
+            model_type=args.model_type,
         )
     else:
         raise RuntimeError(f"Unknown command: {args.command}")

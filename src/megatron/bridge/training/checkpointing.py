@@ -1059,6 +1059,26 @@ def generate_state_dict(
     if iteration is not None:
         state_dict["iteration"] = iteration
 
+        import argparse
+        args = argparse.Namespace()
+
+        args.world_size = 1
+        args.tensor_model_parallel_size = 1
+        args.pipeline_model_parallel_size = 1
+        args.data_parallel_size = 1
+
+        # for megatron/training/checkpointing.py::check_checkpoint_args
+        args.num_layers = model[0].config.num_layers
+        args.hidden_size = model[0].config.hidden_size
+        args.num_attention_heads = model[0].config.num_attention_heads
+        args.add_position_embedding = model[0].position_embedding_type == "learned_absolute"
+
+        print_rank_0(
+            f"Set args={args} for Megatron-LM checkpoint loading."
+        )
+
+        state_dict["args"] = args
+
     state_dict.update(_generate_model_state_dict(model, model_sd_kwargs, ckpt_cfg.ckpt_format))
 
     # Optimizer stuff.

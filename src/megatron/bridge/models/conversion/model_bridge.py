@@ -618,7 +618,7 @@ class MegatronModelBridge(Generic[HFPreTrained, ModelProviderTarget, MegatronMod
 
         megatron_to_hf_tasks = conversion_tasks
         model_config = unwrap_model(megatron_model)[0].config
-        embeddings_are_tied = model_config.share_embeddings_and_output_weights
+        embeddings_are_tied = unwrap_model(megatron_model)[0].share_embeddings_and_output_weights
         for task in self._with_progress_tracking(megatron_to_hf_tasks, "Converting to HuggingFace", show_progress):
             converted_weights_dict = task.mapping.megatron_to_hf(task.param_weight, task.megatron_module)
             converted_weights_dict = self.maybe_modify_converted_hf_weight(
@@ -832,7 +832,7 @@ class MegatronModelBridge(Generic[HFPreTrained, ModelProviderTarget, MegatronMod
 
         mapping_registry = self.mapping_registry()
         model_config = unwrap_model(megatron_model)[0].config
-        embeddings_are_tied = model_config.share_embeddings_and_output_weights
+        embeddings_are_tied = unwrap_model(megatron_model)[0].share_embeddings_and_output_weights
         pp_rank = parallel_state.get_pipeline_model_parallel_rank()
         sorted_global_param_names_all_pp_ranks = self._megatron_global_param_names_all_pp_ranks(megatron_model)
 

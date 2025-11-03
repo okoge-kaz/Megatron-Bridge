@@ -437,7 +437,7 @@ class AutoBridge(Generic[MegatronModelT]):
             dist.barrier()
 
     def save_megatron_model(
-        self, model: list[MegatronModule], path: str | Path, hf_tokenizer_path: Optional[str | Path] = None
+        self, model: list[MegatronModule], path: str | Path, hf_tokenizer_path: Optional[str | Path] = None, iteration: Optional[int] = None
     ) -> None:
         """
         Save a Megatron model in native Megatron checkpoint format without optimizer
@@ -474,7 +474,7 @@ class AutoBridge(Generic[MegatronModelT]):
             from megatron.bridge.training.model_load_save import save_megatron_model
         except ImportError:
             raise ImportError("megatron.bridge.training is not available.")
-        save_megatron_model(model, path, hf_tokenizer_path=hf_tokenizer_path)
+        save_megatron_model(model, path, hf_tokenizer_path=hf_tokenizer_path, iteration=iteration)
 
     def load_megatron_model(
         self, path: str | Path, *, mp_overrides: ModelParallelKwargs | None = None, **kwargs: Unpack[GetModelKwargs]
@@ -536,6 +536,7 @@ class AutoBridge(Generic[MegatronModelT]):
         # Load the state dict
         model = load_megatron_model(
             str(checkpoint_path),
+            model_type=kwargs.get("model_type", "gpt"),  # type: ignore
             use_cpu_init=(skip_temp_dist_context and dist.get_backend() == "gloo"),
             skip_temp_dist_context=skip_temp_dist_context,
             mp_overrides=mp_overrides,
@@ -547,6 +548,7 @@ class AutoBridge(Generic[MegatronModelT]):
         cls,
         hf_model_id: str | Path,
         megatron_path: str | Path,
+        iteration: Optional[int] = None,
         **kwargs,
     ) -> None:
         """
@@ -583,6 +585,7 @@ class AutoBridge(Generic[MegatronModelT]):
             ...     device_map="auto"
             ... )
         """
+
         # Load the HuggingFace model
         bridge = cls.from_hf_pretrained(hf_model_id, **kwargs)
 
@@ -590,13 +593,14 @@ class AutoBridge(Generic[MegatronModelT]):
         megatron_model = bridge.to_megatron_model(wrap_with_ddp=False, use_cpu_initialization=True)
 
         # Save as Megatron checkpoint
-        bridge.save_megatron_model(megatron_model, megatron_path, hf_tokenizer_path=hf_model_id)
+        bridge.save_megatron_model(megatron_model, megatron_path, hf_tokenizer_path=hf_model_id, iteration=iteration)
 
     def export_ckpt(
         self,
         megatron_path: str | Path,
         hf_path: str | Path,
         show_progress: bool = True,
+        model_type: Optional[str] = None,
     ) -> None:
         """
         Export a Megatron checkpoint to HuggingFace format.
@@ -637,7 +641,7 @@ class AutoBridge(Generic[MegatronModelT]):
         # Export ckpt performs on CPU
         with temporary_distributed_context(backend="gloo"):
             # Load the Megatron model
-            megatron_model = self.load_megatron_model(megatron_path, wrap_with_ddp=False)
+            megatron_model = self.load_megatron_model(megatron_path, wrap_with_ddp=False, model_type=model_type)
 
             # Save in HuggingFace format
             self.save_hf_pretrained(megatron_model, hf_path, show_progress=show_progress)
