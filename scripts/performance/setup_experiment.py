@@ -14,7 +14,7 @@
 
 import sys
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 
 try:
@@ -39,8 +39,12 @@ import logging
 
 logger: logging.Logger = logging.getLogger(__name__)
 
+SCRIPT_DIR: Path = Path(__file__).parent.resolve()
+SCRIPT_NAME: str = "run_script.py"
+
 
 def main(
+    script_name: str,
     model_name: str,
     model_size: str,
     domain: str,
@@ -57,24 +61,24 @@ def main(
     enable_nsys: bool,
     use_tokendrop: bool,
     moe_a2a_overlap: bool,
-    tp_size: int,
-    pp_size: int,
-    cp_size: int,
+    tp_size: Optional[int],
+    pp_size: Optional[int],
+    cp_size: Optional[int],
     wandb_key: str,
     wandb_prj_name: str,
     wandb_exp_name: str,
     executor: run.Executor,
 ):
     """Sets up the experiment and runs it."""
-    exp_name = f"{model_name}_{model_size}_{domain}_{task}"
-    exp_name += "_bf16" if compute_dtype == "bf16" else f"_{compute_dtype}_{fp8_recipe}"
-
     if model_name in ["qwen3"] and model_size in ["30b_a3b", "235b_a22b"]:
         assert hf_token is not None, "HF token is required for Qwen3 tokenizer. NullTokenizer to be used soon."
 
-    SCRIPT_DIR: Path = Path(__file__).parent.resolve()
-    RUN_SCRIPT_FILENAME: str = "run_script.py"
-    RUN_SCRIPT_PATH: Path = SCRIPT_DIR / RUN_SCRIPT_FILENAME
+    if wandb_key is not None:
+        assert wandb_prj_name is not None and wandb_exp_name is not None, (
+            "both wandb_prj_name and wandb_exp_name are required for logging with WandB"
+        )
+
+    RUN_SCRIPT_PATH: Path = SCRIPT_DIR / script_name
     logger.info(f"Run script path: {RUN_SCRIPT_PATH}")
     if not RUN_SCRIPT_PATH.is_file():
         logger.error(f"Specified run script not found: {RUN_SCRIPT_PATH}")
@@ -110,16 +114,13 @@ def main(
     if enable_nsys:
         plugins.append(NsysPlugin(profile_step_start=10, profile_step_end=11))
 
-    if wandb_key is not None:
-        assert wandb_prj_name is not None and wandb_exp_name is not None, (
-            "both wandb_prj_name and wandb_exp_name are required for logging with WandB"
-        )
-
-    custom_mounts = custom_mounts + [
-        f"{RUN_SCRIPT_PATH}:{RUN_SCRIPT_PATH}",
-        f"{SCRIPT_DIR}:{SCRIPT_DIR}",
-    ]
-    executor.container_mounts.extend(custom_mounts)
+    executor.container_mounts.extend(
+        custom_mounts
+        + [
+            f"{RUN_SCRIPT_PATH}:{RUN_SCRIPT_PATH}",
+            f"{SCRIPT_DIR}:{SCRIPT_DIR}",
+        ]
+    )
     logger.info(f"Custom mounts: {executor.container_mounts}")
 
     if model_name in ["llama31"] and model_size in ["405b"] and gpu in ["gb200"]:
@@ -148,23 +149,28 @@ def main(
         if "NVTE_NORM_BWD_USE_CUDNN" in executor.env_vars:
             executor.env_vars.pop("NVTE_NORM_BWD_USE_CUDNN")
 
-    target_script_args = list(sys.argv[1:])
-    train_script = run.Script(
-        path=str(RUN_SCRIPT_PATH),
-        entrypoint="python",
-        env={"PYTHONPATH": f"{SCRIPT_DIR}:$PYTHONPATH"},
-        args=target_script_args,
+    exp_name = f"{model_name}_{model_size}_{domain}_{task}" + (
+        "_bf16" if compute_dtype == "bf16" else f"_{compute_dtype}_{fp8_recipe}"
+    )
+    run.run(
+        run.Script(
+            path=str(RUN_SCRIPT_PATH),
+            entrypoint="python",
+            env={"PYTHONPATH": f"{SCRIPT_DIR}:$PYTHONPATH"},
+            args=list(sys.argv[1:]),
+        ),
+        executor=executor,
+        plugins=plugins,
+        dryrun=dryrun,
+        detach=detach,
+        name=exp_name,
     )
 
-    run.run(train_script, executor=executor, plugins=plugins, dryrun=dryrun, detach=detach, name=exp_name)
+    exp_name_result, job_dict = list(run.Experiment.from_title(exp_name).status(return_dict=True).pop().items()).pop()
+    job_status = str(job_dict["status"])
 
-    experiment = run.Experiment.from_title(exp_name)
-    result_dict = experiment.status(return_dict=True)
-    for exp_name_result, job_dict in result_dict.items():
-        job_status = str(job_dict["status"])
-
-        if job_status not in ["SUCCEEDED", "SUBMITTED", "PENDING"]:
-            raise Exception(f"Megatron-Bridge experiment failed for {exp_name_result} with status: {job_status}.")
+    if job_status not in ["SUCCEEDED", "SUBMITTED", "PENDING"]:
+        raise Exception(f"Megatron-Bridge experiment failed for {exp_name_result} with status: {job_status}.")
 
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -173,6 +179,7 @@ if __name__ == "__main__":
     args, _ = parse_cli_args()
 
     main(
+        script_name=SCRIPT_NAME,
         model_name=args.model_name,
         model_size=args.model_size,
         domain=args.domain,
