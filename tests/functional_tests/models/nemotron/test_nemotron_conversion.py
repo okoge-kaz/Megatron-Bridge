@@ -18,69 +18,53 @@ from pathlib import Path
 
 import pytest
 import torch
-from transformers import Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration, Qwen2Tokenizer
+from transformers import AutoTokenizer, NemotronConfig, NemotronForCausalLM
+from transformers.activations import ACT2FN
 
 
-HF_QWEN25_VL_TOY_MODEL_CONFIG = {
-    "architectures": ["Qwen2_5_VLForConditionalGeneration"],
-    "attention_dropout": 0.0,
-    "bos_token_id": 151643,
-    "eos_token_id": 151645,
-    "vision_start_token_id": 151652,
-    "vision_end_token_id": 151653,
-    "vision_token_id": 151654,
-    "image_token_id": 151655,
-    "video_token_id": 151656,
-    "hidden_act": "silu",
-    "hidden_size": 3584,
-    "initializer_range": 0.02,
-    "intermediate_size": 18944,
-    "max_position_embeddings": 128000,
-    "max_window_layers": 2,
-    "model_type": "qwen2_5_vl",
-    "num_attention_heads": 28,
-    "num_hidden_layers": 2,
-    "num_key_value_heads": 4,
-    "rms_norm_eps": 1e-06,
-    "rope_theta": 1000000.0,
-    "sliding_window": 32768,
+# Register relu2 (squared_relu) activation function for Nemotron models
+def squared_relu(x):
+    """Squared ReLU activation function."""
+    return torch.pow(torch.nn.functional.relu(x), 2)
+
+
+# Register the activation function if not already present
+if "relu2" not in ACT2FN:
+    ACT2FN["relu2"] = squared_relu
+
+
+HF_NEMOTRON_TOY_MODEL_CONFIG = {
+    "architectures": ["NemotronForCausalLM"],
+    "bos_token_id": 1,
+    "eos_token_id": 2,
+    "hidden_act": "relu2",  # Nemotron default activation (squared_relu)
+    "hidden_size": 768,  # Smaller for toy model
+    "initializer_range": 0.0134,
+    "intermediate_size": 2304,  # 3 * hidden_size
+    "max_position_embeddings": 2048,  # Smaller for toy model
+    "model_type": "nemotron",
+    "norm_eps": 1e-05,
+    "num_attention_heads": 12,  # Smaller for toy model
+    "num_hidden_layers": 2,  # Very small for testing
+    "num_key_value_heads": 4,  # GQA with 4 KV heads
+    "partial_rotary_factor": 0.5,
+    "rope_theta": 10000.0,
     "tie_word_embeddings": False,
     "torch_dtype": "bfloat16",
-    "transformers_version": "4.41.2",
     "use_cache": True,
-    "use_sliding_window": False,
-    "vision_config": {
-        "depth": 2,
-        "hidden_act": "silu",
-        "hidden_size": 1280,
-        "intermediate_size": 3420,
-        "num_heads": 16,
-        "in_chans": 3,
-        "out_hidden_size": 3584,
-        "patch_size": 14,
-        "spatial_merge_size": 2,
-        "spatial_patch_size": 14,
-        "window_size": 112,
-        "fullatt_block_indexes": [
-            0,
-        ],
-        "tokens_per_second": 2,
-        "temporal_patch_size": 2,
-    },
-    "rope_scaling": {"type": "mrope", "mrope_section": [16, 24, 24]},
-    "vocab_size": 152064,
+    "vocab_size": 32000,  # Smaller vocab for toy model
 }
 
 
-class TestQwen25VLConversion:
+class TestNemotronConversion:
     """
-    Test Qwen25 VL model conversion from local HuggingFace model with different parallelism configurations.
+    Test Nemotron model conversion from local HuggingFace model with different parallelism configurations.
     """
 
     @pytest.fixture(scope="class")
-    def qwen25_vl_toy_model_path(self, tmp_path_factory):
+    def nemotron_toy_model_path(self, tmp_path_factory):
         """
-        Create and save a HuggingFace Qwen25 VL toy model from config to a temporary directory.
+        Create and save a HuggingFace Nemotron toy model from config to a temporary directory.
 
         Args:
             tmp_path_factory: Pytest temporary path factory for class-scoped fixtures
@@ -89,15 +73,15 @@ class TestQwen25VLConversion:
             str: Path to the saved HuggingFace model directory
         """
         # Create a temporary directory for this test class
-        temp_dir = tmp_path_factory.mktemp("qwen25_vl_toy_model")
-        model_dir = temp_dir / "qwen25_vl_toy"
+        temp_dir = tmp_path_factory.mktemp("nemotron_toy_model")
+        model_dir = temp_dir / "nemotron_toy"
 
-        # Create Qwen25 VL config from the toy model config
-        config = Qwen2_5_VLConfig(**HF_QWEN25_VL_TOY_MODEL_CONFIG)
+        # Create Nemotron config from the toy model config
+        config = NemotronConfig(**HF_NEMOTRON_TOY_MODEL_CONFIG)
         config.torch_dtype = torch.bfloat16  # Explicitly set the torch_dtype in config
 
         # Create model with random weights and convert to bfloat16
-        model = Qwen2_5_VLForConditionalGeneration(config)
+        model = NemotronForCausalLM(config)
         model = model.bfloat16()  # Use .bfloat16() method instead of .to()
 
         # Debug: Check model dtype before saving
@@ -105,22 +89,23 @@ class TestQwen25VLConversion:
             print(f"Before save - {name}: {param.dtype}")
             break  # Just check the first parameter
 
-        # Download and save tokenizer from a reference Qwen25 VL model
-        # We use the smallest available Qwen25 VL model for tokenizer artifacts
+        # Create minimal tokenizer files
+        # Since Nemotron may not have a readily available tokenizer, we'll create minimal files
         try:
-            tokenizer = Qwen2Tokenizer.from_pretrained("Qwen/Qwen2.5-VL-3B-Instruct")
+            # Try to use a compatible tokenizer (GPT-2 or similar)
+            tokenizer = AutoTokenizer.from_pretrained("gpt2")
             tokenizer.save_pretrained(model_dir)
         except Exception as e:
             print(f"Warning: Could not download tokenizer, creating minimal tokenizer files: {e}")
             # Create minimal tokenizer files if download fails
             # This is a fallback for offline environments
             tokenizer_config = {
-                "tokenizer_class": "Qwen2Tokenizer",
-                "vocab_size": 151936,
-                "bos_token": "<|endoftext|>",
-                "eos_token": "<|endoftext|>",
-                "pad_token": "<|endoftext|>",
-                "unk_token": "<|endoftext|>",
+                "tokenizer_class": "GPT2Tokenizer",
+                "vocab_size": 32000,
+                "bos_token": "<s>",
+                "eos_token": "</s>",
+                "pad_token": "</s>",
+                "unk_token": "<unk>",
             }
 
             with open(model_dir / "tokenizer_config.json", "w") as f:
@@ -130,22 +115,22 @@ class TestQwen25VLConversion:
         model.save_pretrained(model_dir, safe_serialization=True)
 
         # Also save config.json explicitly to ensure compatibility with correct torch_dtype
-        config_to_save = HF_QWEN25_VL_TOY_MODEL_CONFIG.copy()
+        config_to_save = HF_NEMOTRON_TOY_MODEL_CONFIG.copy()
         config_path = model_dir / "config.json"
         with open(config_path, "w") as f:
             json.dump(config_to_save, f, indent=2)
 
         return str(model_dir)
 
-    def test_toy_model_creation(self, qwen25_vl_toy_model_path):
+    def test_toy_model_creation(self, nemotron_toy_model_path):
         """
         Test that the toy model is created correctly and can be loaded.
 
         Args:
-            qwen25_vl_toy_model_path: Path to the toy Qwen25 VL model (from fixture)
+            nemotron_toy_model_path: Path to the toy Nemotron model (from fixture)
         """
         # Verify the model directory exists
-        model_path = Path(qwen25_vl_toy_model_path)
+        model_path = Path(nemotron_toy_model_path)
         assert model_path.exists(), f"Model directory not found at {model_path}"
 
         # Check essential files exist
@@ -166,36 +151,33 @@ class TestQwen25VLConversion:
         with open(config_file) as f:
             config_data = json.load(f)
 
-        assert config_data["model_type"] == "qwen2_5_vl"
-        assert config_data["hidden_size"] == 3584
+        assert config_data["model_type"] == "nemotron"
+        assert config_data["hidden_size"] == 768
         assert config_data["num_hidden_layers"] == 2
-        assert config_data["num_attention_heads"] == 28
-        assert config_data["vocab_size"] == 152064
-        assert "vision_config" in config_data
+        assert config_data["num_attention_heads"] == 12
+        assert config_data["vocab_size"] == 32000
 
         # Try loading the model to verify it's valid
         try:
-            model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                qwen25_vl_toy_model_path,
+            model = NemotronForCausalLM.from_pretrained(
+                nemotron_toy_model_path,
                 torch_dtype=torch.bfloat16,
                 low_cpu_mem_usage=False,  # Ensure full loading
             )
 
             # Try loading the tokenizer as well
             try:
-                tokenizer = Qwen2Tokenizer.from_pretrained(qwen25_vl_toy_model_path)
+                tokenizer = AutoTokenizer.from_pretrained(nemotron_toy_model_path)
                 print(f"Tokenizer loaded successfully with vocab_size: {tokenizer.vocab_size}")
             except Exception as e:
                 print(f"Warning: Could not load tokenizer (this might be OK for conversion testing): {e}")
 
-            # Verify model structure for VL model
+            # Verify model structure
             assert hasattr(model, "model")
-            assert hasattr(model.model, "language_model")
-            assert hasattr(model.model.language_model, "layers")
-            assert len(model.model.language_model.layers) == 2  # num_hidden_layers
-            assert hasattr(model.model, "visual")  # VL model should have visual component
+            assert hasattr(model.model, "layers")
+            assert len(model.model.layers) == 2  # num_hidden_layers
 
-            print(f"SUCCESS: Toy model created and validated at {qwen25_vl_toy_model_path}")
+            print(f"SUCCESS: Toy model created and validated at {nemotron_toy_model_path}")
             print("Model weights are correctly in bfloat16 format")
 
         except Exception as e:
@@ -209,12 +191,12 @@ class TestQwen25VLConversion:
             (1, 2, "PP"),
         ],
     )
-    def test_qwen25_vl_conversion_parallelism(self, qwen25_vl_toy_model_path, tmp_path, tp, pp, test_name):
+    def test_nemotron_conversion_parallelism(self, nemotron_toy_model_path, tmp_path, tp, pp, test_name):
         """
-        Test Qwen25 VL model conversion with different parallelism configurations.
+        Test Nemotron model conversion with different parallelism configurations.
 
         Args:
-            qwen25_vl_toy_model_path: Path to the toy Qwen25 VL model (from fixture)
+            nemotron_toy_model_path: Path to the toy Nemotron model (from fixture)
             tmp_path: Pytest temporary path fixture
             tp: Tensor parallelism size
             pp: Pipeline parallelism size
@@ -222,10 +204,10 @@ class TestQwen25VLConversion:
         """
 
         # Create temporary output directory for conversion results
-        test_output_dir = tmp_path / f"qwen25_vl_{test_name}"
+        test_output_dir = tmp_path / f"nemotron_{test_name}"
         test_output_dir.mkdir(exist_ok=True)
 
-        # Run hf_megatron_roundtrip_multi_gpu.py with specified parallelism configuration on our toy model
+        # Run multi_gpu_hf.py with specified parallelism configuration on our toy model
         cmd = [
             "python",
             "-m",
@@ -240,7 +222,7 @@ class TestQwen25VLConversion:
             "--parallel-mode",
             "examples/conversion/hf_megatron_roundtrip_multi_gpu.py",
             "--hf-model-id",
-            qwen25_vl_toy_model_path,  # Use our local toy model instead of downloading
+            nemotron_toy_model_path,  # Use our local toy model instead of downloading
             "--output-dir",
             str(test_output_dir),
             "--tp",
@@ -251,19 +233,18 @@ class TestQwen25VLConversion:
 
         try:
             result = subprocess.run(
-                cmd, capture_output=True, text=True, cwd=Path(__file__).parent.parent.parent.parent
+                cmd, capture_output=True, text=True, cwd=Path(__file__).parent.parent.parent.parent.parent
             )
-            print(cmd)
 
             # Check that the conversion completed successfully
             if result.returncode != 0:
                 print(f"STDOUT: {result.stdout}")
                 print(f"STDERR: {result.stderr}")
-                assert False, f"Qwen25 VL {test_name} conversion failed with return code {result.returncode}"
+                assert False, f"Nemotron {test_name} conversion failed with return code {result.returncode}"
 
             # Verify that the converted model was saved
             # The output directory should be named after the last part of the model path
-            model_name = Path(qwen25_vl_toy_model_path).name  # "qwen25_vl_toy"
+            model_name = Path(nemotron_toy_model_path).name  # "nemotron_toy"
             converted_model_dir = test_output_dir / model_name
             assert converted_model_dir.exists(), f"Converted model directory not found at {converted_model_dir}"
 
@@ -278,18 +259,17 @@ class TestQwen25VLConversion:
                 f"Model weights file not found in converted model at {converted_model_dir}"
             )
 
-            # Verify the config contains Qwen25 VL-specific parameters
+            # Verify the config contains Nemotron-specific parameters
             with open(config_file) as f:
                 saved_config = json.load(f)
 
-            assert saved_config["model_type"] == "qwen2_5_vl", "Model type should be qwen2_5_vl"
-            assert saved_config["hidden_size"] == 3584, "Hidden size should match toy config"
-            assert saved_config["num_attention_heads"] == 28, "Number of attention heads should match toy config"
-            assert "vision_config" in saved_config, "VL model should have vision_config"
+            assert saved_config["model_type"] == "nemotron", "Model type should be nemotron"
+            assert saved_config["hidden_size"] == 768, "Hidden size should match toy config"
+            assert saved_config["num_attention_heads"] == 12, "Number of attention heads should match toy config"
 
-            print(f"SUCCESS: Qwen25 VL {test_name} conversion test completed successfully")
+            print(f"SUCCESS: Nemotron {test_name} conversion test completed successfully")
             print(f"Converted model saved at: {converted_model_dir}")
 
         except Exception as e:
-            print(f"Error during Qwen25 VL {test_name} conversion test: {e}")
+            print(f"Error during Nemotron {test_name} conversion test: {e}")
             raise
