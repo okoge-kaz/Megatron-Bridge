@@ -26,7 +26,7 @@ module load hpcx/2.23.0
 
 source /home/acf15649kv/src/Megatron-LM-v0.13.0rc2/.venv/bin/activate
 
-ITERATIONS=(23000)
+ITERATIONS=(23500)
 
 for ITERATION in "${ITERATIONS[@]}"; do
   FORMATTED_ITERATION="$(printf "%07d" "${ITERATION}")"
@@ -34,8 +34,8 @@ for ITERATION in "${ITERATIONS[@]}"; do
 
   # model config
   HF_CHECKPOINT_DIR=/groups/gag51395/hf_checkpoints/Qwen3-8B
-  MEGATRON_CHECKPOINT_DIR=/groups/gch51639/fujii/checkpoints/Qwen-3-Swallow-8B-v0.1-SFT/swallow-reasoning/exp12/LR1.50E-5-MINLR1.50E-6-WD0.1/iter_${FORMATTED_ITERATION}
-  HF_CHECKPOINT_SAVE_DIR=/groups/gag51395/checkpoints/megatron-to-hf/Qwen3-Swallow-8B-v0.1-SFT/swallow-reasoning/exp12/iteration_${FORMATTED_ITERATION}
+  MEGATRON_CHECKPOINT_DIR=/groups/gch51639/fujii/checkpoints/Qwen-3-Swallow-8B-v0.1-SFT/swallow-reasoning/exp14/LR1.50E-5-MINLR1.50E-6-WD0.1/iter_${FORMATTED_ITERATION}
+  HF_CHECKPOINT_SAVE_DIR=/groups/gch51639/fujii/checkpoints/megatron-to-hf/Qwen3-Swallow-8B-v0.1-SFT/swallow-reasoning/exp14/iteration_${FORMATTED_ITERATION}
   mkdir -p "${HF_CHECKPOINT_SAVE_DIR}"
 
   # skip if megatron checkpoint not found
@@ -46,7 +46,7 @@ for ITERATION in "${ITERATIONS[@]}"; do
 
   export CUDA_DEVICE_MAX_CONNECTIONS=1
   MEGATRON_LM_PATH=/home/acf15649kv/src/Megatron-LM-v0.13.0rc2
-  MEGATRON_BRIDGE_PATH=/home/acf15649kv/src/Megatron-Bridge/src
+  MEGATRON_BRIDGE_PATH=/home/acf15649kv/src/Megatron-Bridge-mcore0.13.0/src
   export PYTHONPATH="$PYTHONPATH:$MEGATRON_LM_PATH:$MEGATRON_BRIDGE_PATH"
 
   # convert
