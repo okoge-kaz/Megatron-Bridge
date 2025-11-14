@@ -34,8 +34,8 @@ for ITERATION in "${ITERATIONS[@]}"; do
 
   # model config
   HF_CHECKPOINT_DIR=/groups/gag51395/hf_checkpoints/Meta-Llama-3.1-8B
-  MEGATRON_CHECKPOINT_DIR=/groups/gag51395/fujii/checkpoints/Llama-3.1-8b/swallow-corpus/exp7/tp1-pp1-ct1/LR2.5E-5-MINLR2.5E-6-WD0.1/iter_${FORMATTED_ITERATION}
-  HF_CHECKPOINT_SAVE_DIR=/groups/gch51639/fujii/checkpoints/megatron-to-hf/Llama-3.1-8b/swallow-corpus-v3/exp7/iteration_${FORMATTED_ITERATION}
+  MEGATRON_CHECKPOINT_DIR=/groups/gch51639/fujii/checkpoints/Llama-3.1-8b/swallow-corpus/exp8/tp1-pp1-ct1/LR2.5E-5-MINLR2.5E-6-WD0.1/iter_${FORMATTED_ITERATION}
+  HF_CHECKPOINT_SAVE_DIR=/groups/gch51639/fujii/checkpoints/megatron-to-hf/Llama-3.1-8b/swallow-corpus-v3/exp8/iteration_${FORMATTED_ITERATION}
   mkdir -p "${HF_CHECKPOINT_SAVE_DIR}"
 
   # skip if megatron checkpoint not found
@@ -43,10 +43,11 @@ for ITERATION in "${ITERATIONS[@]}"; do
     echo "WARN: ${MEGATRON_CHECKPOINT_DIR} not found. Skipping..."
     continue
   fi
+  PWD=$(pwd)
 
   export CUDA_DEVICE_MAX_CONNECTIONS=1
   MEGATRON_LM_PATH=/home/acf15649kv/src/Megatron-LM-v0.13.0rc2
-  MEGATRON_BRIDGE_PATH=/home/acf15649kv/src/Megatron-Bridge/src
+  MEGATRON_BRIDGE_PATH=$PWD/src
   export PYTHONPATH="$PYTHONPATH:$MEGATRON_LM_PATH:$MEGATRON_BRIDGE_PATH"
 
   # convert
