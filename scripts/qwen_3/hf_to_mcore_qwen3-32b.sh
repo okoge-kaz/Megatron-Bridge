@@ -22,6 +22,11 @@ module load hpcx/2.20
 
 MODEL_NAME=Qwen3-32B
 
+MEGATRON_LM_PATH=/home/acf15649kv/src/Megatron-LM-v0.14.0rc7
+MEGATRON_BRIDGE_PATH=$(pwd)/src
+export PYTHONPATH=$PYTHONPATH:$MEGATRON_LM_PATH
+export PYTHONPATH=$PYTHONPATH:$MEGATRON_BRIDGE_PATH
+
 # model config
 HF_CHECKPOINT_DIR=/groups/gag51395/hf_checkpoints/${MODEL_NAME}
 MEGATRON_CHECKPOINT_DIR=/groups/gag51395/checkpoints/hf-to-megatron/Megatron-Bridge-mcore-v0.14/${MODEL_NAME}
@@ -31,11 +36,6 @@ mkdir -p ${MEGATRON_CHECKPOINT_DIR}
 TOKENIZER_MODEL=/groups/gag51395/hf_checkpoints/${MODEL_NAME}
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1
-MEGATRON_LM_PATH=/home/acf15649kv/src/Megatron-LM-v0.14.0rc7
-MEGATRON_BRIDGE_PATH=/home/acf15649kv/src/Megatron-Bridge/src
-export PYTHONPATH=$PYTHONPATH:$MEGATRON_LM_PATH
-export PYTHONPATH=$PYTHONPATH:$MEGATRON_BRIDGE_PATH
-
 export MEGATRON_ARGS=1
 
 # convert

@@ -24,7 +24,10 @@ module load cudnn/9.10.2
 module load nccl/2.27.5-cuda12.9
 module load hpcx/2.23.0
 
-source /home/acf15649kv/src/Megatron-LM-v0.13.0rc2/.venv/bin/activate
+MEGATRON_LM_PATH=/home/acf15649kv/src/Megatron-LM-v0.14.0rc7
+MEGATRON_BRIDGE_PATH=$(pwd)/src
+export PYTHONPATH=$PYTHONPATH:$MEGATRON_LM_PATH
+export PYTHONPATH=$PYTHONPATH:$MEGATRON_BRIDGE_PATH
 
 # model config
 HF_CHECKPOINT_DIR=/groups/gag51395/hf_checkpoints/Qwen3-235B-A22B-Thinking-2507
@@ -33,10 +36,6 @@ MEGATRON_CHECKPOINT_DIR=/groups/gag51395/checkpoints/hf-to-megatron/Megatron-Bri
 mkdir -p ${MEGATRON_CHECKPOINT_DIR}
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1
-MEGATRON_LM_PATH=/home/acf15649kv/src/Megatron-LM-v0.13.0rc2
-MEGATRON_BRIDGE_PATH=/home/acf15649kv/src/Megatron-Bridge/src
-export PYTHONPATH=$PYTHONPATH:$MEGATRON_LM_PATH
-export PYTHONPATH=$PYTHONPATH:$MEGATRON_BRIDGE_PATH
 
 # convert
 python examples/conversion/convert_checkpoints.py import \

@@ -20,6 +20,11 @@ source /etc/profile.d/modules.sh
 module use /home/acf15649kv/modules/modulefiles
 module load hpcx/2.20
 
+MEGATRON_LM_PATH=/home/acf15649kv/src/Megatron-LM-v0.14.0rc7
+MEGATRON_BRIDGE_PATH=$(pwd)/src
+export PYTHONPATH=$PYTHONPATH:$MEGATRON_LM_PATH
+export PYTHONPATH=$PYTHONPATH:$MEGATRON_BRIDGE_PATH
+
 ITERATIONS=(100)
 
 for ITERATION in "${ITERATIONS[@]}"; do
@@ -39,9 +44,6 @@ for ITERATION in "${ITERATIONS[@]}"; do
   fi
 
   export CUDA_DEVICE_MAX_CONNECTIONS=1
-  MEGATRON_LM_PATH=/home/acf15649kv/src/Megatron-LM-v0.14.0rc7
-  MEGATRON_BRIDGE_PATH=/home/acf15649kv/src/Megatron-Bridge/src
-  export PYTHONPATH="$PYTHONPATH:$MEGATRON_LM_PATH:$MEGATRON_BRIDGE_PATH"
 
   # convert
   singularity exec \
