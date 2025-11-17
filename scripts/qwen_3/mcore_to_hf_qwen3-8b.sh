@@ -26,7 +26,7 @@ module load hpcx/2.23.0
 
 source /home/acf15649kv/src/Megatron-LM-v0.13.0rc2/.venv/bin/activate
 
-ITERATIONS=(100 200 400 800 1600 3200 4500 6400 9000 12800 18000 25000)
+ITERATIONS=(500 2000 4000 8000 10000 12500)
 
 for ITERATION in "${ITERATIONS[@]}"; do
   FORMATTED_ITERATION="$(printf "%07d" "${ITERATION}")"
@@ -34,8 +34,8 @@ for ITERATION in "${ITERATIONS[@]}"; do
 
   # model config
   HF_CHECKPOINT_DIR=/groups/gag51395/hf_checkpoints/Qwen3-8B-Base
-  MEGATRON_CHECKPOINT_DIR=/groups/gch51639/fujii/checkpoints/Qwen-3-Swallow-8B/tp2-pp1-ct1/LR1.50E-5-MINLR1.50E-6-WD0.1/iter_${FORMATTED_ITERATION}
-  HF_CHECKPOINT_SAVE_DIR=/groups/gch51639/fujii/checkpoints/megatron-to-hf/Qwen3-Swallow-8B/tp2-pp1-ct1/LR1.50E-5-MINLR1.50E-6-WD0.1/iteration_${FORMATTED_ITERATION}
+  MEGATRON_CHECKPOINT_DIR=/groups/gch51639/fujii/checkpoints/Qwen-3-Swallow-8B-reasoning/exp5/tp2-pp1-ct1/LR1.50E-5-MINLR1.50E-6-WD0.1/iter_${FORMATTED_ITERATION}
+  HF_CHECKPOINT_SAVE_DIR=/groups/gch51639/fujii/checkpoints/megatron-to-hf/Qwen3-Swallow-8B-reasoning/exp5/LR1.50E-5-MINLR1.50E-6-WD0.1/iteration_${FORMATTED_ITERATION}
   mkdir -p "${HF_CHECKPOINT_SAVE_DIR}"
 
   # skip if megatron checkpoint not found
