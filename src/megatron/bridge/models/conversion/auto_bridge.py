@@ -597,6 +597,7 @@ class AutoBridge(Generic[MegatronModelT]):
             use_cpu_init=(skip_temp_dist_context and dist.get_backend() == "gloo"),
             skip_temp_dist_context=skip_temp_dist_context,
             mp_overrides=mp_overrides,
+            model_type=kwargs.get("model_type"),  # type: ignore
         )
         return model if isinstance(model, list) else [model]
 
@@ -657,6 +658,7 @@ class AutoBridge(Generic[MegatronModelT]):
         show_progress: bool = True,
         strict: bool = False,
         source_path: Optional[Union[str, Path]] = None,
+        model_type: Optional[str] = None,
     ) -> None:
         """
         Export a Megatron checkpoint to HuggingFace format.
@@ -702,7 +704,7 @@ class AutoBridge(Generic[MegatronModelT]):
         # Export ckpt performs on CPU
         with temporary_distributed_context(backend="gloo"):
             # Load the Megatron model
-            megatron_model = self.load_megatron_model(megatron_path, wrap_with_ddp=False)
+            megatron_model = self.load_megatron_model(megatron_path, wrap_with_ddp=False, model_type=model_type)
 
             # Save in HuggingFace format
             self.save_hf_pretrained(
