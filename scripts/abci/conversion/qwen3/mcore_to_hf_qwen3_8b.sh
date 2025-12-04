@@ -25,12 +25,9 @@ MEGATRON_BRIDGE_PATH=$(pwd)/src
 export PYTHONPATH=$PYTHONPATH:$MEGATRON_LM_PATH
 export PYTHONPATH=$PYTHONPATH:$MEGATRON_BRIDGE_PATH
 
-# ngc-pytorch-25.10: transformers==4.55.4
-# local: ~/.local/lib/python3.12/site-packages/ (transformers, torchao)
-
-ITERATIONS=(100 1600 3200 4500 6400 9000 12800 18000 25000)
-MEGATRON_CHECKPOINT_DIR=/groups/gch51639/fujii/checkpoints/Qwen-3-Swallow-8B-v0.1-fp8-param/tp2-pp1-ct1/LR1.50E-5-MINLR1.50E-6-WD0.1
-HF_CHECKPOINT_SAVE_DIR=/groups/gch51639/fujii/checkpoints/megatron-to-hf/Qwen3-8B-fp8-param/LR1.50E-5-MINLR1.50E-6-WD0.1
+ITERATIONS=(500 2000 4000 8000 10000 12500)
+MEGATRON_CHECKPOINT_DIR=/groups/gch51639/fujii/checkpoints/Qwen-3-Swallow-8B-swallow-corpus-v3/exp3/tp2-pp1-ct1/LR1.50E-5-MINLR1.50E-6-WD0.1
+HF_CHECKPOINT_SAVE_DIR=/groups/gch51639/fujii/checkpoints/megatron-to-hf/Qwen3-Swallow-8B-swallow-corpus-v3/v3.2-gpt-oss-guard/LR1.50E-5-MINLR1.50E-6-WD0.1
 
 for ITERATION in "${ITERATIONS[@]}"; do
   FORMATTED_ITERATION="$(printf "%07d" "${ITERATION}")"
