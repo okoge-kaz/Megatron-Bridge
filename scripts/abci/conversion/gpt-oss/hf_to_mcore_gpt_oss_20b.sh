@@ -30,9 +30,6 @@ MEGATRON_BRIDGE_PATH=$(pwd)/src
 export PYTHONPATH=$PYTHONPATH:$MEGATRON_LM_PATH
 export PYTHONPATH=$PYTHONPATH:$MEGATRON_BRIDGE_PATH
 
-# ngc-pytorch-25.10: transformers==4.55.4
-# local: ~/.local/lib/python3.12/site-packages/ (transformers, torchao)
-
 singularity exec \
   --nv \
   --bind /groups/gag51395:/groups/gag51395 \
