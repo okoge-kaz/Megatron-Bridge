@@ -520,7 +520,11 @@ class AutoBridge(Generic[MegatronModelT]):
         save_megatron_model(model, path, hf_tokenizer_path=hf_tokenizer_path, iteration=iteration)
 
     def load_megatron_model(
-        self, path: str | Path, *, mp_overrides: ModelParallelKwargs | None = None, **kwargs: Unpack[GetModelKwargs]
+        self,
+        path: str | Path,
+        *,
+        mp_overrides: ModelParallelKwargs | None = None,
+        **kwargs: Unpack[GetModelKwargs]
     ) -> list[MegatronModelT]:
         """
         Load a Megatron model from a native Megatron checkpoint.
