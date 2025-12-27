@@ -2,7 +2,7 @@
 
 set -e
 
-ITERATIONS=(12800)
+ITERATIONS=(18000 25000)
 
 upload_base_dir=/groups/gch51639/fujii/checkpoints/megatron-to-hf/Qwen-3-Swallow-8B-v0.2/tp2-pp1-ct1/LR1.50E-5-MINLR1.50E-6-WD0.1
 
