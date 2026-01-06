@@ -16,7 +16,7 @@ mkdir -p outputs/convert/megatron-to-hf/
 echo "Nodes allocated to this job:"
 cat $PBS_NODEFILE
 
-ITERATIONS=(4500)
+ITERATIONS=(6400)
 
 for ITERATION in "${ITERATIONS[@]}"; do
   FORMATTED_ITERATION="$(printf "%07d" "${ITERATION}")"
