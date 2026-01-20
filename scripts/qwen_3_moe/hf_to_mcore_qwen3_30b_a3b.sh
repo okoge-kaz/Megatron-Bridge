@@ -16,20 +16,9 @@ mkdir -p outputs/convert/hf-to-megatron
 echo "Nodes allocated to this job:"
 cat $PBS_NODEFILE
 
-source /etc/profile.d/modules.sh
-module use /home/acf15649kv/modules/modulefiles
-
-module load cuda/12.9.1
-module load cudnn/9.10.2
-module load nccl/2.27.5-cuda12.9
-module load hpcx/2.23.0
-
-source /home/acf15649kv/src/Megatron-LM-v0.13.0rc2/.venv/bin/activate
-
 # model config
 HF_CHECKPOINT_DIR=/groups/gag51395/hf_checkpoints/Qwen3-30B-A3B-Thinking-2507
 MEGATRON_CHECKPOINT_DIR=/groups/gag51395/checkpoints/hf-to-megatron/Megatron-Bridge/Qwen3-30B-A3B-Thinking-2507
-
 mkdir -p ${MEGATRON_CHECKPOINT_DIR}
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1
@@ -39,7 +28,16 @@ export PYTHONPATH=$PYTHONPATH:$MEGATRON_LM_PATH
 export PYTHONPATH=$PYTHONPATH:$MEGATRON_BRIDGE_PATH
 
 # convert
-python examples/models/checkpoint_conversion.py import \
+singularity exec \
+  --nv \
+  --bind /groups/gag51395:/groups/gag51395 \
+  --bind /groups/gch51639:/groups/gch51639 \
+  --bind /home/acf15649kv:/home/acf15649kv \
+  --bind /dev/shm:/dev/shm \
+  --bind /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/ssl/certs/ca-certificates.crt \
+  --bind /tmp:/tmp \
+  /groups/gch51639/fujii/container/ngc-pytorch-25.10.sif \
+  python examples/models/checkpoint_conversion.py import \
   --hf-model ${HF_CHECKPOINT_DIR} \
   --megatron-path ${MEGATRON_CHECKPOINT_DIR} \
   --torch-dtype bfloat16
