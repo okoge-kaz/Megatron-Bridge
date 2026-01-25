@@ -16,7 +16,7 @@ mkdir -p outputs/convert/megatron-to-hf/
 echo "Nodes allocated to this job:"
 cat $PBS_NODEFILE
 
-ITERATIONS=(25000)
+ITERATIONS=(17374)
 
 for ITERATION in "${ITERATIONS[@]}"; do
   FORMATTED_ITERATION="$(printf "%07d" "${ITERATION}")"
@@ -24,8 +24,8 @@ for ITERATION in "${ITERATIONS[@]}"; do
 
   # model config
   HF_CHECKPOINT_DIR=/groups/gag51395/hf_checkpoints/Qwen3-32B
-  MEGATRON_CHECKPOINT_DIR=/groups/gch51639/fujii/checkpoints/Qwen-3-Swallow-32B-v0.2/tp4-pp1-ct2/LR1.00E-5-MINLR1.00E-6-WD0.1/iter_${FORMATTED_ITERATION}
-  HF_CHECKPOINT_SAVE_DIR=/groups/gch51639/fujii/checkpoints/megatron-to-hf/Qwen3-Swallow-32B-v0.2/tp4-pp1-ct2/LR1.00E-5-MINLR1.00E-6-WD0.1/iteration_${FORMATTED_ITERATION}
+  MEGATRON_CHECKPOINT_DIR=/groups/gch51639/fujii/checkpoints/Qwen-3-Swallow-32B-SFT-v0.2/exp2/LR1.00E-5-MINLR1.00E-6-WD0.1/iter_${FORMATTED_ITERATION}
+  HF_CHECKPOINT_SAVE_DIR=/groups/gch51639/fujii/checkpoints/megatron-to-hf/Qwen3-Swallow-32B-Instruct-v0.2/exp2/tp4-pp1-ct2/LR1.00E-5-MINLR1.00E-6-WD0.1/iteration_${FORMATTED_ITERATION}
   mkdir -p "${HF_CHECKPOINT_SAVE_DIR}"
 
   # skip if megatron checkpoint not found
