@@ -1,44 +1,49 @@
-#!/bin/sh
-#PBS -q rt_HF
-#PBS -N hf-to-megatron
-#PBS -l select=1:ncpus=192:ngpus=8
-#PBS -l walltime=1:00:00
-#PBS -j oe
-#PBS -m n
-#PBS -v USE_SSH=1
-#PBS -koed
-#PBS -V
-#PBS -o outputs/convert/hf-to-megatron/
+#!/bin/bash
+#SBATCH --job-name=hf-to-mcore
+#SBATCH --time=1:00:00
+#SBATCH --partition=part-group_9d80ef
+#SBATCH --nodes 1
+#SBATCH --ntasks-per-node=1
+#SBATCH --exclusive
+#SBATCH --output=outputs/hf-to-mcore/%x-%j.out
+#SBATCH --error=outputs/hf-to-mcore/%x-%j.out
 
-cd $PBS_O_WORKDIR
-mkdir -p outputs/convert/hf-to-megatron
+set -eu -o pipefail
 
-echo "Nodes allocated to this job:"
-cat $PBS_NODEFILE
+echo "Job ID: $SLURM_JOB_ID"
+echo "Node list: $SLURM_NODELIST"
+echo "Node name: $SLURMD_NODENAME"
+echo "----------------------------------------"
+
+module load singularitypro/4.1
+
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+export TORCH_CUDA_ARCH_LIST="9.0"
 
 # model config
-HF_CHECKPOINT_DIR=/groups/gag51395/hf_checkpoints/Qwen3-8B
-MEGATRON_CHECKPOINT_DIR=/groups/gag51395/checkpoints/hf-to-megatron/Megatron-Bridge/Qwen3-8B
+HF_CHECKPOINT_DIR=/home/group_9d80ef/kazuki_fujii/hf_checkpoints/Qwen3-8B-Base
+MEGATRON_CHECKPOINT_DIR=/home/group_9d80ef/kazuki_fujii/checkpoints/hf-to-megatron/Megatron-Bridge/Qwen3-8B-Base
+
 mkdir -p ${MEGATRON_CHECKPOINT_DIR}
 
 # tokenizer config
-TOKENIZER_MODEL=/groups/gag51395/hf_checkpoints/Qwen3-8B
+TOKENIZER_MODEL=/home/group_9d80ef/kazuki_fujii/hf_checkpoints/Qwen3-8B-Base
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1
-MEGATRON_LM_PATH=/home/acf15649kv/src/Megatron-LM-v0.15.0
+MEGATRON_LM_PATH=/home/group_9d80ef/kazuki_fujii/src/Megatron-LM-v0.15.0
 MEGATRON_BRIDGE_PATH=$(pwd)/src
-export PYTHONPATH="$PYTHONPATH:$MEGATRON_LM_PATH:$MEGATRON_BRIDGE_PATH"
+export PYTHONPATH="${PYTHONPATH:-}:$MEGATRON_LM_PATH:$MEGATRON_BRIDGE_PATH"
+
+nvidia-smi --query-gpu=index,name,memory.free --format=csv
 
 # convert
 singularity exec \
   --nv \
-  --bind /groups/gag51395:/groups/gag51395 \
-  --bind /groups/gch51639:/groups/gch51639 \
-  --bind /home/acf15649kv:/home/acf15649kv \
+  --bind /home/user_00001_9d80ef:/home/user_00001_9d80ef \
+  --bind /home/group_9d80ef:/home/group_9d80ef \
   --bind /dev/shm:/dev/shm \
-  --bind /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/ssl/certs/ca-certificates.crt \
   --bind /tmp:/tmp \
-  /groups/gch51639/fujii/container/ngc-pytorch-25.10.sif \
+  /home/group_9d80ef/kazuki_fujii/container/nemo-25.11.sif \
   python examples/models/checkpoint_conversion.py import \
   --hf-model ${HF_CHECKPOINT_DIR} \
   --megatron-path ${MEGATRON_CHECKPOINT_DIR} \
