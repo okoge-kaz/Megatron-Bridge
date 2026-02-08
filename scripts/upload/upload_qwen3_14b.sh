@@ -13,7 +13,7 @@ upload_checkpoint() {
   local retry_count=0
 
   while [ $retry_count -lt $max_retries ]; do
-    if python scripts/upload/upload.py \
+    if python3 scripts/upload/upload.py \
         --ckpt-path "$upload_dir" \
         --repo-name "$repo_name"; then
         echo "Successfully uploaded $repo_name"
