@@ -32,7 +32,7 @@ TOKENIZER_MODEL=/home/group_9d80ef/kazuki_fujii/hf_checkpoints/Qwen3-14B-Base
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 MEGATRON_LM_PATH=/home/group_9d80ef/kazuki_fujii/src/Megatron-LM-v0.15.0
 MEGATRON_BRIDGE_PATH=$(pwd)/src
-export PYTHONPATH="$PYTHONPATH:$MEGATRON_LM_PATH:$MEGATRON_BRIDGE_PATH"
+export PYTHONPATH="$MEGATRON_BRIDGE_PATH:$MEGATRON_LM_PATH:${PYTHONPATH:-}"
 
 nvidia-smi --query-gpu=index,name,memory.free --format=csv
 

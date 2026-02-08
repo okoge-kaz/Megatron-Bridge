@@ -1,41 +1,36 @@
-#!/bin/sh
-#PBS -q rt_HF
-#PBS -N megatron-to-hf
-#PBS -l select=1:ncpus=192:ngpus=8
-#PBS -l walltime=1:00:00
-#PBS -j oe
-#PBS -m n
-#PBS -v USE_SSH=1
-#PBS -koed
-#PBS -V
-#PBS -o outputs/convert/megatron-to-hf/
+#!/bin/bash
+#SBATCH --job-name=mcore-to-hf
+#SBATCH --time=1:00:00
+#SBATCH --partition=part-group_9d80ef
+#SBATCH --nodes 1
+#SBATCH --ntasks-per-node=1
+#SBATCH --exclusive
+#SBATCH --output=outputs/mcore-to-hf/%x-%j.out
+#SBATCH --error=outputs/mcore-to-hf/%x-%j.out
 
-cd $PBS_O_WORKDIR
-mkdir -p outputs/convert/megatron-to-hf/
+set -eu -o pipefail
 
-echo "Nodes allocated to this job:"
-cat $PBS_NODEFILE
+echo "Job ID: $SLURM_JOB_ID"
+echo "Node list: $SLURM_NODELIST"
+echo "Node name: $SLURMD_NODENAME"
+echo "----------------------------------------"
 
-source /etc/profile.d/modules.sh
-module use /home/acf15649kv/modules/modulefiles
+module load singularitypro/4.1
 
-module load cuda/12.9.1
-module load cudnn/9.10.2
-module load nccl/2.27.5-cuda12.9
-module load hpcx/2.23.0
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+export TORCH_CUDA_ARCH_LIST="9.0"
+nvidia-smi --query-gpu=index,name,memory.free --format=csv
 
-source /home/acf15649kv/src/Megatron-LM-v0.13.0rc2/.venv/bin/activate
-
-ITERATIONS=(100 200 400 800 1600 3200 4500 6400 9000 12800 18000 25000)
+ITERATIONS=(100 1600 3200 6400 9000 12800 18000 25000)
 
 for ITERATION in "${ITERATIONS[@]}"; do
   FORMATTED_ITERATION="$(printf "%07d" "${ITERATION}")"
   echo -e "Converting iteration ${ITERATION}\n"
 
   # model config
-  HF_CHECKPOINT_DIR=/groups/gag51395/hf_checkpoints/Qwen3-14B-Base
-  MEGATRON_CHECKPOINT_DIR=/groups/gch51639/fujii/checkpoints/Qwen-3-Swallow-14B-v0.1/tp4-pp1-ct1/LR1.50E-5-MINLR1.50E-6-WD0.1/iter_${FORMATTED_ITERATION}
-  HF_CHECKPOINT_SAVE_DIR=/groups/gch51639/fujii/checkpoints/megatron-to-hf/Qwen3-Swallow-14B-v0.1/tp4-pp1-ct1/LR1.50E-5-MINLR1.50E-6-WD0.1/iteration_${FORMATTED_ITERATION}
+  HF_CHECKPOINT_DIR=/home/group_9d80ef/kazuki_fujii/hf_checkpoints/Qwen3-14B-Base
+  MEGATRON_CHECKPOINT_DIR=/home/group_9d80ef/kazuki_fujii/checkpoints/Qwen3-Swallow-14B-v0.2/tp4-pp1-ct1/LR1.50E-5-MINLR1.50E-6-WD0.1/iter_${FORMATTED_ITERATION}
+  HF_CHECKPOINT_SAVE_DIR=/home/group_9d80ef/kazuki_fujii/checkpoints/megatron-to-hf/Qwen3-Swallow-14B-v0.2/tp4-pp1-ct1/LR1.50E-5-MINLR1.50E-6-WD0.1/iteration_${FORMATTED_ITERATION}
   mkdir -p "${HF_CHECKPOINT_SAVE_DIR}"
 
   # skip if megatron checkpoint not found
@@ -45,14 +40,21 @@ for ITERATION in "${ITERATIONS[@]}"; do
   fi
 
   export CUDA_DEVICE_MAX_CONNECTIONS=1
-  MEGATRON_LM_PATH=/home/acf15649kv/src/Megatron-LM-v0.13.0rc2
-  MEGATRON_BRIDGE_PATH=$(pwd)/src
-  export PYTHONPATH="$PYTHONPATH:$MEGATRON_LM_PATH:$MEGATRON_BRIDGE_PATH"
+  MEGATRON_LM_PATH=/home/group_9d80ef/kazuki_fujii/src/Megatron-LM-v0.15.0
+  MEGATRON_BRIDGE_PATH=/home/group_9d80ef/kazuki_fujii/src/Megatron-Bridge-v0.15.0/src
 
   # convert
-  python examples/models/checkpoint_conversion.py export \
-    --hf-model "${HF_CHECKPOINT_DIR}" \
-    --megatron-path "${MEGATRON_CHECKPOINT_DIR}" \
-    --hf-path "${HF_CHECKPOINT_SAVE_DIR}" \
-    --model-type gpt
+  singularity exec \
+  --nv \
+  --bind /home/user_00001_9d80ef:/home/user_00001_9d80ef \
+  --bind /home/group_9d80ef:/home/group_9d80ef \
+  --bind /dev/shm:/dev/shm \
+  --bind /tmp:/tmp \
+  /home/group_9d80ef/kazuki_fujii/container/nemo-25.11.sif \
+  bash -c "export PYTHONPATH=${MEGATRON_BRIDGE_PATH}:${MEGATRON_LM_PATH}:\${PYTHONPATH:-} && \
+    python examples/models/checkpoint_conversion.py export \
+      --hf-model ${HF_CHECKPOINT_DIR} \
+      --megatron-path ${MEGATRON_CHECKPOINT_DIR} \
+      --hf-path ${HF_CHECKPOINT_SAVE_DIR} \
+      --model-type gpt"
 done

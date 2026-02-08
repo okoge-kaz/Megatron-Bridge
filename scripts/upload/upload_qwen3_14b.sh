@@ -1,10 +1,10 @@
 #!/bin/bash
 
-set -e
+set -eu -o pipefail
 
-ITERATIONS=(100 200 400 800 1600 3200 4500 6400 9000 12800 18000 25000)
+ITERATIONS=(100 1600 3200 6400 9000 12800 18000 25000)
 
-upload_base_dir=/groups/gch51639/fujii/checkpoints/megatron-to-hf/Qwen3-Swallow-14B-v0.1/tp4-pp1-ct1/LR1.50E-5-MINLR1.50E-6-WD0.1
+upload_base_dir=/home/group_9d80ef/kazuki_fujii/checkpoints/megatron-to-hf/Qwen3-Swallow-14B-v0.2/tp4-pp1-ct1/LR1.50E-5-MINLR1.50E-6-WD0.1
 
 upload_checkpoint() {
   local upload_dir=$1
@@ -32,7 +32,7 @@ upload_checkpoint() {
 for ITERATION in "${ITERATIONS[@]}"; do
   FORMATTED_ITERATION="$(printf "%07d" "${ITERATION}")"
   upload_dir=$upload_base_dir/iteration_${FORMATTED_ITERATION}
-  repo_name="tokyotech-llm/Qwen3-Swallow-14B-v0.1-LR1.5E-5-iter${FORMATTED_ITERATION}"
+  repo_name="tokyotech-llm/Qwen3-Swallow-14B-v0.2-CPT-LR1.5E-5-iter${FORMATTED_ITERATION}"
 
   if ! upload_checkpoint "$upload_dir" "$repo_name"; then
     echo "Skipping to next checkpoint after repeated failures for $repo_name"
