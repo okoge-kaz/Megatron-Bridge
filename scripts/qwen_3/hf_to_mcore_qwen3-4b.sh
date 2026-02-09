@@ -25,7 +25,7 @@ mkdir -p ${MEGATRON_CHECKPOINT_DIR}
 TOKENIZER_MODEL=/groups/gag51395/hf_checkpoints/Qwen3-4B-Base
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1
-MEGATRON_LM_PATH=/home/acf15649kv/src/Megatron-LM-v0.15.0
+MEGATRON_LM_PATH=/home/acf15649kv/src/pre-training/Megatron-LM-v0.15.0
 MEGATRON_BRIDGE_PATH=$(pwd)/src
 export PYTHONPATH="$PYTHONPATH:$MEGATRON_LM_PATH:$MEGATRON_BRIDGE_PATH"
 
