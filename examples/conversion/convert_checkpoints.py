@@ -142,6 +142,7 @@ def export_megatron_to_hf(
     hf_path: str,
     show_progress: bool = True,
     strict: bool = True,
+    model_type: Optional[str] = None,
 ) -> None:
     """
     Export a Megatron checkpoint to HuggingFace format.
@@ -168,11 +169,9 @@ def export_megatron_to_hf(
             config_files = list(latest_iter.glob("run_config.yaml"))
 
     if not config_files:
-        raise FileNotFoundError(
-            f"Could not find run_config.yaml in {checkpoint_path}. Please ensure this is a valid Megatron checkpoint."
-        )
-
-    print(f"📋 Found configuration: {config_files[0]}")
+        print("⚠️ Warning: No run_config.yaml found. Proceeding without model config.")
+    else:
+        print(f"📋 Found configuration: {config_files[0]}")
 
     # For demonstration, we'll create a bridge from a known config
     # This would typically be extracted from the checkpoint metadata
@@ -185,6 +184,7 @@ def export_megatron_to_hf(
         hf_path=hf_path,
         show_progress=show_progress,
         strict=strict,
+        model_type=model_type,
     )
 
     print(f"✅ Successfully exported model to: {hf_path}")
@@ -234,6 +234,7 @@ def main():
         "--hf-path", required=True, help="Directory path where the HuggingFace model will be saved"
     )
     export_parser.add_argument("--no-progress", action="store_true", help="Disable progress bar during export")
+    export_parser.add_argument("--model-type", choices=["gpt", "mamba"])
     export_parser.add_argument(
         "--not-strict", action="store_true", help="Allow source and target checkpoint to have different keys"
     )
@@ -260,6 +261,7 @@ def main():
             hf_path=args.hf_path,
             show_progress=not args.no_progress,
             strict=not args.not_strict,
+            model_type=args.model_type,
         )
     else:
         raise RuntimeError(f"Unknown command: {args.command}")

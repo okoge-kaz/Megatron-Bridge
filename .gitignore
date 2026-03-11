@@ -184,3 +184,6 @@ slurm*.out
 
 # UV package manager
 .uv/
+
+# Local environment variables
+outputs/
