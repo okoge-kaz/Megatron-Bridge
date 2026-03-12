@@ -44,7 +44,7 @@ singularity exec \
   --bind /dev/shm:/dev/shm \
   --bind /tmp:/tmp \
   /home/group_9d80ef/kazuki_fujii/container/nemo-25.11.sif \
-  python examples/models/checkpoint_conversion.py import \
+  python examples/conversion/convert_checkpoints.py import \
   --hf-model ${HF_CHECKPOINT_DIR} \
   --megatron-path ${MEGATRON_CHECKPOINT_DIR} \
   --torch-dtype bfloat16

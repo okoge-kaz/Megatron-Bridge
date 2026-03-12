@@ -30,7 +30,7 @@ mkdir -p ${MEGATRON_CHECKPOINT_DIR}
 TOKENIZER_MODEL=/home/group_9d80ef/kazuki_fujii/hf_checkpoints/Qwen3-8B-Base
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1
-MEGATRON_LM_PATH=/home/group_9d80ef/kazuki_fujii/src/Megatron-LM-v0.15.0
+MEGATRON_LM_PATH=/home/group_9d80ef/kazuki_fujii/src/Megatron-LM-v0.17.0-dev
 MEGATRON_BRIDGE_PATH=$(pwd)/src
 export PYTHONPATH="$MEGATRON_BRIDGE_PATH:$MEGATRON_LM_PATH:${PYTHONPATH:-}"
 
@@ -43,8 +43,8 @@ singularity exec \
   --bind /home/group_9d80ef:/home/group_9d80ef \
   --bind /dev/shm:/dev/shm \
   --bind /tmp:/tmp \
-  /home/group_9d80ef/kazuki_fujii/container/nemo-25.11.sif \
-  python examples/models/checkpoint_conversion.py import \
+  /home/group_9d80ef/kazuki_fujii/container/ngc-pytorch-26.01.sif \
+  python examples/conversion/convert_checkpoints.py import \
   --hf-model ${HF_CHECKPOINT_DIR} \
   --megatron-path ${MEGATRON_CHECKPOINT_DIR} \
   --torch-dtype bfloat16

@@ -40,7 +40,7 @@ singularity exec \
   --bind /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:/etc/ssl/certs/ca-certificates.crt \
   --bind /tmp:/tmp \
   /groups/gch51639/fujii/container/ngc-pytorch-25.10.sif \
-  python examples/models/checkpoint_conversion.py import \
+  python examples/conversion/convert_checkpoints.py import \
   --hf-model ${HF_CHECKPOINT_DIR} \
   --megatron-path ${MEGATRON_CHECKPOINT_DIR} \
   --torch-dtype bfloat16

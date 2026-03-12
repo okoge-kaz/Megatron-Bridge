@@ -52,7 +52,7 @@ for ITERATION in "${ITERATIONS[@]}"; do
   --bind /tmp:/tmp \
   /home/group_9d80ef/kazuki_fujii/container/nemo-25.11.sif \
   bash -c "export PYTHONPATH=${MEGATRON_BRIDGE_PATH}:${MEGATRON_LM_PATH}:\${PYTHONPATH:-} && \
-    python examples/models/checkpoint_conversion.py export \
+    python examples/conversion/convert_checkpoints.py export \
       --hf-model ${HF_CHECKPOINT_DIR} \
       --megatron-path ${MEGATRON_CHECKPOINT_DIR} \
       --hf-path ${HF_CHECKPOINT_SAVE_DIR} \

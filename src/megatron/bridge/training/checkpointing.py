@@ -50,11 +50,16 @@ from megatron.core.process_groups_config import ProcessGroupCollection
 from megatron.core.rerun_state_machine import get_rerun_state_machine
 from megatron.core.transformer import MegatronModule
 from megatron.core.utils import get_pg_size, unwrap_model
-from modelopt.torch.opt.plugins import (
-    restore_modelopt_state,
-    save_modelopt_state,
-    save_sharded_modelopt_state,
-)
+try:
+    from modelopt.torch.opt.plugins import (
+        restore_modelopt_state,
+        save_modelopt_state,
+        save_sharded_modelopt_state,
+    )
+
+    _MODELOPT_AVAILABLE = True
+except ImportError:
+    _MODELOPT_AVAILABLE = False
 
 from megatron.bridge.peft.base import PEFT
 from megatron.bridge.training import fault_tolerance
@@ -683,13 +688,13 @@ def save_checkpoint(
             # [ModelOpt]: save sharded modelopt_state (skip if model is empty, e.g., low-memory save mode)
             if model:
                 # cfg.dist can be None during checkpoint conversion (save_megatron_model)
-                if not (cfg.dist and cfg.dist.use_decentralized_pg):
+                if not (cfg.dist and cfg.dist.use_decentralized_pg) and _MODELOPT_AVAILABLE:
                     save_sharded_modelopt_state(model, checkpoint_name, (ckpt_cfg.ckpt_format, 1))
     else:
         # [ModelOpt]: Inject modelopt_state into state_dict (skip if model is empty)
         if ckpt_type == CheckpointType.LOCAL:
             print_rank_0("WARNING: Local checkpointing does not support nvidia_modelopt.")
-        elif model:  # GLOBAL checkpoint type, only if model is available
+        elif model and _MODELOPT_AVAILABLE:  # GLOBAL checkpoint type, only if model is available
             save_modelopt_state(model, state_dict)
 
         if ckpt_type == CheckpointType.LOCAL:
@@ -1264,7 +1269,8 @@ def _load_model_weights_from_checkpoint(
     model_sd_kwargs = dict(metadata=sharded_sd_metadata)
 
     # [ModelOpt]: Restore state
-    restore_modelopt_state(model, state_dict)
+    if _MODELOPT_AVAILABLE:
+        restore_modelopt_state(model, state_dict)
 
     model = unwrap_model(model)
     pg_collection = get_pg_collection(model)

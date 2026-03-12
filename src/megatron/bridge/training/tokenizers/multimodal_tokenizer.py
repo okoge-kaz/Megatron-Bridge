@@ -12,11 +12,7 @@ import numpy as np
 from megatron.core.models.multimodal.llava_model import IGNORE_INDEX, IMAGE_TOKEN
 
 
-try:
-    from megatron.core.datasets.megatron_tokenizer import MegatronLegacyTokenizer as MegatronTokenizer
-except ImportError:
-    # Fallback to old path
-    from megatron.core.datasets.megatron_tokenizer import MegatronTokenizer as MegatronTokenizer
+from megatron.core.tokenizers.megatron_tokenizer import MegatronTokenizer
 
 
 IMAGE_TAGS = {
