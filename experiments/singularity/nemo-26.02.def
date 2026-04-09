@@ -11,4 +11,4 @@ From: nvcr.io/nvidia/nemo:26.02
   chmod -R o+rX /opt/Run
   chmod -R o+rX /opt/venv
 
-  pip install --upgrade  wandb transformers nvidia-modelopt[hf] datasets jsonlines tqdm torchao nvidia-ml-py omegaconf
+  pip install --upgrade wandb

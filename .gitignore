@@ -171,6 +171,8 @@ examples/*/data
 wandb
 dump.py
 
+outputs
+
 docs/sources/source/test_build/
 
 # Checkpoints, config files and temporary files created in tutorials.
