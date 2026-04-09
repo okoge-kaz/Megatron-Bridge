@@ -1,0 +1,14 @@
+Bootstrap: docker
+From: nvcr.io/nvidia/nemo:26.02
+
+%post
+  # Grant read/execute permissions to editable-installed packages for non-root users
+  chmod -R o+rX /opt/Megatron-Bridge
+  chmod -R o+rX /opt/NeMo
+  chmod -R o+rX /opt/NeMo-FW
+  chmod -R o+rX /opt/Export-Deploy
+  chmod -R o+rX /opt/Evaluator
+  chmod -R o+rX /opt/Run
+  chmod -R o+rX /opt/venv
+
+  pip install --upgrade  wandb transformers nvidia-modelopt[hf] datasets jsonlines tqdm torchao nvidia-ml-py omegaconf
