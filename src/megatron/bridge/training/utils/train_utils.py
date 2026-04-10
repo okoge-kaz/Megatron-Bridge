@@ -348,6 +348,7 @@ def training_log(
     history_wct: list,
     model: list[MegatronModule],
     log_max_attention_logit: Optional[float] = None,
+    history_effective_tokens: Optional[list] = None,
 ) -> bool:
     """Log training stats (losses, learning rate, timings, etc.).
 
@@ -485,6 +486,7 @@ def training_log(
                 seq_length=config.dataset.seq_length,
                 history_wct=history_wct,
                 window_size=logger_config.throughput_window_size,
+                history_effective_tokens=history_effective_tokens,
             )
             if writer:
                 for metric, value in throughput_report.items():
@@ -666,10 +668,17 @@ def training_log(
 
         # Calculate GPU utilization
         num_flops = num_floating_point_operations(config, batch_size)
+        # Correct FLOPs for actual effective tokens (e.g., VLM where actual sequence length
+        # differs from configured seq_length due to vision token expansion or padding).
+        if history_effective_tokens is not None and len(history_effective_tokens) > total_iterations:
+            effective_tokens_in_interval = (
+                history_effective_tokens[-1] - history_effective_tokens[-(total_iterations + 1)]
+            )
+            configured_tokens_in_interval = total_iterations * batch_size * config.model.seq_length
+            if configured_tokens_in_interval > 0:
+                num_flops = num_flops * (effective_tokens_in_interval / configured_tokens_in_interval)
         per_gpu_tf = num_flops / elapsed_time_per_iteration / get_world_size_safe() / 1e12
-        print_rank_0(
-            f"Step Time : {elapsed_time_per_iteration:.2f}s GPU utilization: {per_gpu_tf:.1f}MODEL_TFLOP/s/GPU"
-        )
+        print_rank_0(f"Step Time : {elapsed_time_per_iteration:.2f}s")
 
         if logger_config.log_throughput_to_tensorboard:
             if writer:
@@ -932,6 +941,7 @@ def report_throughput(
     seq_length: int,
     history_wct: list,
     window_size: int,
+    history_effective_tokens: Optional[list] = None,
 ) -> dict:
     """
     Logs the training throughput and utilization.
@@ -950,14 +960,14 @@ def report_throughput(
     +-------------------------------------+-----------------------------------------------------------+
     |                                     | Rolling average (over `window_size` most recent           |
     | `throughput/tokens_per_sec`         | batches) of the number of tokens processed per second.    |
-    |                                     | Only logged if dataspec returns tokens per batch.         |
+    |                                     | Uses effective tokens (actual tensor size) when available.|
     +-------------------------------------+-----------------------------------------------------------+
     | `throughput/device/batches_per_sec` | `throughput/batches_per_sec` divided by world size.       |
     +-------------------------------------+-----------------------------------------------------------+
     | `throughput/device/samples_per_sec` | `throughput/samples_per_sec` divided by world size.       |
     +-------------------------------------+-----------------------------------------------------------+
-    |                                     | `throughput/tokens_per_sec` divided by world size. Only   |
-    | `throughput/device/tokens_per_sec`  | logged if dataspec returns tokens per batch.              |
+    |                                     | `throughput/tokens_per_sec` divided by world size.        |
+    | `throughput/device/tokens_per_sec`  |                                                           |
     |                                     |                                                           |
     +-------------------------------------+-----------------------------------------------------------+
     Args:
@@ -966,13 +976,19 @@ def report_throughput(
         seq_length (int): model sequence length.
         history_wct (list): list of elapsed time per each iteration.
         window_size (int, optional): Number of batches to use for a rolling average of throughput.
+        history_effective_tokens (Optional[list]): cumulative effective token counts per iteration.
+            When provided, used instead of seq_length * samples for token throughput calculation.
     Returns:
         Dictionary with throughput metrics.
     """
     if iteration >= window_size:
         history_iters = [i for i in range(iteration - window_size + 1, iteration + 1)]
         history_samples = [i * train_config.global_batch_size for i in history_iters]
-        history_tokens = [i * seq_length for i in history_samples]
+        # Use effective tokens (actual tensor size) if available, otherwise fall back to seq_length * samples
+        if history_effective_tokens is not None and len(history_effective_tokens) > window_size:
+            history_tokens = list(history_effective_tokens)
+        else:
+            history_tokens = [i * seq_length for i in history_samples]
         world_size = get_world_size_safe()
         elapsed_batches = len(history_samples) - 1
         elapsed_samples = int(history_samples[-1]) - int(history_samples[0])

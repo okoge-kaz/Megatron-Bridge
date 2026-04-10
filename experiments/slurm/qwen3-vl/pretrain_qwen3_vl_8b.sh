@@ -78,6 +78,8 @@ if [[ -n "${CHECKPOINT_DIR:-}" ]]; then
   CHECKPOINT_ARGS="--checkpoint-dir ${CHECKPOINT_DIR}"
 fi
 
+export SINGULARITYENV_PYTHONPATH=/home/group_821839/home/kazuki_fujii/src/infra/Megatron-Bridge-v0.3.1/src${PYTHONPATH:+:$PYTHONPATH}
+
 srun singularity exec \
   --nv \
   --bind /home/user_00024_821839:/home/user_00024_821839 \

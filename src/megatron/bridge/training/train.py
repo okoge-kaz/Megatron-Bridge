@@ -249,10 +249,12 @@ def train(
             optimizers=[optimizer],
         )
 
-    # Track train step elapsed time for throughput logging
+    # Track train step elapsed time and effective tokens for throughput logging
     history_wct = None
+    history_effective_tokens = None
     if config.logger.log_throughput_to_tensorboard:
         history_wct = deque(maxlen=config.logger.throughput_window_size + 1)
+        history_effective_tokens = deque(maxlen=config.logger.throughput_window_size + 1)
 
     # Wrap forward_backward_func for Full iteration CUDA graph
     forward_backward_func = get_forward_backward_func(
@@ -402,6 +404,19 @@ def train(
 
         if config.logger.log_throughput_to_tensorboard:
             history_wct.append(time.time() - global_state.start_time)
+            # Collect effective tokens from forward_step (accumulated per microbatch on first PP stage).
+            # For DP, each rank tracks its own microbatches; all-reduce to get global count.
+            effective_tokens_local = getattr(global_state, "_effective_tokens_in_step", 0)
+            if effective_tokens_local > 0:
+                effective_tokens_tensor = torch.tensor([effective_tokens_local], dtype=torch.long, device="cuda")
+                torch.distributed.all_reduce(effective_tokens_tensor, group=pg_collection.dp)
+                cumulative = (history_effective_tokens[-1] if history_effective_tokens else 0)
+                history_effective_tokens.append(cumulative + int(effective_tokens_tensor.item()))
+            else:
+                # Fallback: use configured seq_length * batch_size
+                cumulative = (history_effective_tokens[-1] if history_effective_tokens else 0)
+                history_effective_tokens.append(cumulative + batch_size * config.model.seq_length)
+            global_state._effective_tokens_in_step = 0
 
         if should_checkpoint:
             save_checkpoint_and_time(
@@ -496,6 +511,7 @@ def train(
             history_wct,
             model,
             log_max_attention_logit,
+            history_effective_tokens=history_effective_tokens,
         )
 
         if (

@@ -431,6 +431,11 @@ def forward_step(
             else:
                 output_tensor = model_output
 
+    # Track effective tokens (actual tensor size, excluding padding tokens) for throughput logging.
+    # Accumulated per microbatch; reset per step in the train loop.
+    if tokens is not None:
+        state._effective_tokens_in_step = getattr(state, "_effective_tokens_in_step", 0) + tokens.numel()
+
     loss_function = _create_loss_function(loss_mask, check_for_nan_in_loss, check_for_spiky_loss)
 
     return output_tensor, loss_function
