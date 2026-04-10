@@ -477,7 +477,7 @@ def training_log(
                 dump(snapshot, f)
                 print_rank_0(f"Saved memory snapshot to {filename}")
 
-    if writer and (iteration % logger_config.tensorboard_log_interval == 0):
+    if (writer or wandb_writer or mlflow_logger) and (iteration % logger_config.tensorboard_log_interval == 0):
         if logger_config.log_throughput_to_tensorboard:
             throughput_report = report_throughput(
                 iteration=iteration,
@@ -486,8 +486,9 @@ def training_log(
                 history_wct=history_wct,
                 window_size=logger_config.throughput_window_size,
             )
-            for metric, value in throughput_report.items():
-                writer.add_scalar(metric, value, iteration)
+            if writer:
+                for metric, value in throughput_report.items():
+                    writer.add_scalar(metric, value, iteration)
             if wandb_writer:
                 wandb_writer.log(throughput_report, iteration)
             if mlflow_logger:
@@ -495,8 +496,9 @@ def training_log(
         if logger_config.log_memory_to_tensorboard:
             memory_report = report_memory(memory_keys=logger_config.memory_keys)
             memory_report = {f"memory/{mem_stat}": val for (mem_stat, val) in memory_report.items()}
-            for metric, value in memory_report.items():
-                writer.add_scalar(metric, value, iteration)
+            if writer:
+                for metric, value in memory_report.items():
+                    writer.add_scalar(metric, value, iteration)
             if wandb_writer:
                 wandb_writer.log(memory_report, iteration)
             if mlflow_logger:
@@ -509,103 +511,115 @@ def training_log(
                 train_iters=train_config.train_iters,
                 time_unit=logger_config.runtime_time_unit,
             )
-            for metric, value in runtime_report.items():
-                writer.add_scalar(metric, value, iteration)
+            if writer:
+                for metric, value in runtime_report.items():
+                    writer.add_scalar(metric, value, iteration)
             if wandb_writer:
                 wandb_writer.log(runtime_report, iteration)
             if mlflow_logger:
                 mlflow_logger.log_metrics(_sanitize_mlflow_metrics(runtime_report), step=iteration)
         if logger_config.log_l2_norm_grad_to_tensorboard:
             l2_report = report_l2_norm_grad(model)
-            for metric, value in l2_report.items():
-                writer.add_scalar(metric, value, iteration)
+            if writer:
+                for metric, value in l2_report.items():
+                    writer.add_scalar(metric, value, iteration)
             if wandb_writer:
                 wandb_writer.log(l2_report, iteration)
             if mlflow_logger:
                 mlflow_logger.log_metrics(_sanitize_mlflow_metrics(l2_report), step=iteration)
         if wandb_writer:
-            wandb_writer.log({"samples vs steps": train_state.consumed_train_samples}, iteration)
+            wandb_writer.log({"training/samples vs steps": train_state.consumed_train_samples}, iteration)
         if mlflow_logger:
             mlflow_logger.log_metrics({"samples vs steps": train_state.consumed_train_samples}, step=iteration)
-        writer.add_scalar("learning-rate", learning_rate, iteration)
-        writer.add_scalar("learning-rate vs samples", learning_rate, train_state.consumed_train_samples)
+        if writer:
+            writer.add_scalar("learning-rate", learning_rate, iteration)
+            writer.add_scalar("learning-rate vs samples", learning_rate, train_state.consumed_train_samples)
         if wandb_writer and learning_rate is not None:
-            wandb_writer.log({"learning-rate": learning_rate}, iteration)
+            wandb_writer.log({"training/learning-rate": learning_rate}, iteration)
         if mlflow_logger and learning_rate is not None:
             mlflow_logger.log_metrics({"learning-rate": learning_rate}, step=iteration)
-        if config.optimizer.decoupled_lr is not None:
+        if config.optimizer.decoupled_lr is not None and writer:
             writer.add_scalar("decoupled-learning-rate", decoupled_learning_rate, iteration)
         if global_state.train_state.skipped_train_samples > 0:
-            writer.add_scalar("skipped-train-samples", global_state.train_state.skipped_train_samples, iteration)
+            if writer:
+                writer.add_scalar("skipped-train-samples", global_state.train_state.skipped_train_samples, iteration)
             if wandb_writer:
-                wandb_writer.log({"skipped-train-samples": global_state.train_state.skipped_train_samples}, iteration)
+                wandb_writer.log({"training/skipped-train-samples": global_state.train_state.skipped_train_samples}, iteration)
             if mlflow_logger:
                 mlflow_logger.log_metrics(
                     {"skipped-train-samples": global_state.train_state.skipped_train_samples},
                     step=iteration,
                 )
-        writer.add_scalar("batch-size", batch_size, iteration)
-        writer.add_scalar("batch-size vs samples", batch_size, global_state.train_state.consumed_train_samples)
+        if writer:
+            writer.add_scalar("batch-size", batch_size, iteration)
+            writer.add_scalar("batch-size vs samples", batch_size, global_state.train_state.consumed_train_samples)
         if wandb_writer:
-            wandb_writer.log({"batch-size": batch_size}, iteration)
+            wandb_writer.log({"training/batch-size": batch_size}, iteration)
         if mlflow_logger:
             mlflow_logger.log_metrics({"batch-size": batch_size}, step=iteration)
         for key in loss_dict:
-            writer.add_scalar(key, loss_dict[key], iteration)
-            writer.add_scalar(key + " vs samples", loss_dict[key], global_state.train_state.consumed_train_samples)
+            if writer:
+                writer.add_scalar(key, loss_dict[key], iteration)
+                writer.add_scalar(key + " vs samples", loss_dict[key], global_state.train_state.consumed_train_samples)
             if wandb_writer:
-                wandb_writer.log({key: loss_dict[key]}, iteration)
+                wandb_writer.log({"loss/" + key: loss_dict[key]}, iteration)
         if mlflow_logger:
             loss_metrics = {key: float(val) for key, val in loss_dict.items()}
             mlflow_logger.log_metrics(loss_metrics, step=iteration)
         if logger_config.log_loss_scale_to_tensorboard:
-            writer.add_scalar("loss-scale", loss_scale, iteration)
-            writer.add_scalar("loss-scale vs samples", loss_scale, global_state.train_state.consumed_train_samples)
+            if writer:
+                writer.add_scalar("loss-scale", loss_scale, iteration)
+                writer.add_scalar("loss-scale vs samples", loss_scale, global_state.train_state.consumed_train_samples)
             if wandb_writer:
-                wandb_writer.log({"loss-scale": loss_scale}, iteration)
+                wandb_writer.log({"training/loss-scale": loss_scale}, iteration)
             if mlflow_logger:
                 mlflow_logger.log_metrics({"loss-scale": loss_scale}, step=iteration)
         if logger_config.log_world_size_to_tensorboard:
-            writer.add_scalar("world-size", get_world_size_safe(), iteration)
-            writer.add_scalar(
-                "world-size vs samples", get_world_size_safe(), global_state.train_state.consumed_train_samples
-            )
+            if writer:
+                writer.add_scalar("world-size", get_world_size_safe(), iteration)
+                writer.add_scalar(
+                    "world-size vs samples", get_world_size_safe(), global_state.train_state.consumed_train_samples
+                )
             if wandb_writer:
-                wandb_writer.log({"world-size": get_world_size_safe()}, iteration)
+                wandb_writer.log({"training/world-size": get_world_size_safe()}, iteration)
             if mlflow_logger:
                 mlflow_logger.log_metrics({"world-size": get_world_size_safe()}, step=iteration)
         if grad_norm is not None:
-            writer.add_scalar("grad-norm", grad_norm, iteration)
-            writer.add_scalar("grad-norm vs samples", grad_norm, global_state.train_state.consumed_train_samples)
+            if writer:
+                writer.add_scalar("grad-norm", grad_norm, iteration)
+                writer.add_scalar("grad-norm vs samples", grad_norm, global_state.train_state.consumed_train_samples)
             if wandb_writer:
-                wandb_writer.log({"grad-norm": grad_norm}, iteration)
+                wandb_writer.log({"training/grad-norm": grad_norm}, iteration)
             if mlflow_logger:
                 mlflow_logger.log_metrics({"grad-norm": grad_norm}, step=iteration)
         if num_zeros_in_grad is not None:
-            writer.add_scalar("num-zeros", num_zeros_in_grad, iteration)
-            writer.add_scalar(
-                "num-zeros vs samples", num_zeros_in_grad, global_state.train_state.consumed_train_samples
-            )
+            if writer:
+                writer.add_scalar("num-zeros", num_zeros_in_grad, iteration)
+                writer.add_scalar(
+                    "num-zeros vs samples", num_zeros_in_grad, global_state.train_state.consumed_train_samples
+                )
             if wandb_writer:
-                wandb_writer.log({"num-zeros": num_zeros_in_grad}, iteration)
+                wandb_writer.log({"training/num-zeros": num_zeros_in_grad}, iteration)
             if mlflow_logger:
                 mlflow_logger.log_metrics({"num-zeros": num_zeros_in_grad}, step=iteration)
         if params_norm is not None:
-            writer.add_scalar("params-norm", params_norm, iteration)
-            writer.add_scalar("params-norm vs samples", params_norm, global_state.train_state.consumed_train_samples)
+            if writer:
+                writer.add_scalar("params-norm", params_norm, iteration)
+                writer.add_scalar("params-norm vs samples", params_norm, global_state.train_state.consumed_train_samples)
             if wandb_writer:
-                wandb_writer.log({"params-norm": params_norm}, iteration)
+                wandb_writer.log({"training/params-norm": params_norm}, iteration)
             if mlflow_logger:
                 mlflow_logger.log_metrics({"params-norm": params_norm}, step=iteration)
         if log_max_attention_logit is not None:
-            writer.add_scalar("max-attention-logit", log_max_attention_logit, iteration)
-            writer.add_scalar(
-                "max-attention-logit vs samples",
-                log_max_attention_logit,
-                global_state.train_state.consumed_train_samples,
-            )
+            if writer:
+                writer.add_scalar("max-attention-logit", log_max_attention_logit, iteration)
+                writer.add_scalar(
+                    "max-attention-logit vs samples",
+                    log_max_attention_logit,
+                    global_state.train_state.consumed_train_samples,
+                )
             if wandb_writer:
-                wandb_writer.log({"max-attention-logit": log_max_attention_logit}, iteration)
+                wandb_writer.log({"training/max-attention-logit": log_max_attention_logit}, iteration)
             if mlflow_logger:
                 mlflow_logger.log_metrics({"max-attention-logit": log_max_attention_logit}, step=iteration)
 
@@ -661,25 +675,25 @@ def training_log(
             if writer:
                 writer.add_scalar("throughput/tflops/device", per_gpu_tf, iteration)
                 writer.add_scalar("throughput/tflops", per_gpu_tf * get_world_size_safe(), iteration)
-                if wandb_writer:
-                    wandb_writer.log({"throughput/tflops/device": per_gpu_tf}, iteration)
-                    wandb_writer.log({"throughput/tflops": per_gpu_tf * get_world_size_safe()}, iteration)
-                if mlflow_logger:
-                    mlflow_logger.log_metrics(
-                        _sanitize_mlflow_metrics(
-                            {
-                                "throughput/tflops/device": per_gpu_tf,
-                                "throughput/tflops": per_gpu_tf * get_world_size_safe(),
-                            }
-                        ),
-                        step=iteration,
-                    )
+            if wandb_writer:
+                wandb_writer.log({"throughput/tflops/device": per_gpu_tf}, iteration)
+                wandb_writer.log({"throughput/tflops": per_gpu_tf * get_world_size_safe()}, iteration)
+            if mlflow_logger:
+                mlflow_logger.log_metrics(
+                    _sanitize_mlflow_metrics(
+                        {
+                            "throughput/tflops/device": per_gpu_tf,
+                            "throughput/tflops": per_gpu_tf * get_world_size_safe(),
+                        }
+                    ),
+                    step=iteration,
+                )
 
         if logger_config.log_timers_to_tensorboard:
             if writer:
                 writer.add_scalar("iteration-time", elapsed_time_per_iteration, iteration)
             if wandb_writer:
-                wandb_writer.log({"iteration-time": elapsed_time_per_iteration}, iteration)
+                wandb_writer.log({"timing/iteration-time": elapsed_time_per_iteration}, iteration)
             if mlflow_logger:
                 mlflow_logger.log_metrics({"iteration-time": elapsed_time_per_iteration}, step=iteration)
         log_string = f" [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]"
@@ -701,8 +715,8 @@ def training_log(
                 writer.add_scalar("iter-energy/gpu", energy, iteration)
                 writer.add_scalar("power/gpu", power, iteration)
             if wandb_writer:
-                wandb_writer.log({"iter-energy/gpu": energy}, iteration)
-                wandb_writer.log({"power/gpu": power}, iteration)
+                wandb_writer.log({"energy/iter-energy-gpu": energy}, iteration)
+                wandb_writer.log({"energy/power-gpu": power}, iteration)
             if mlflow_logger:
                 mlflow_logger.log_metrics(
                     _sanitize_mlflow_metrics({"iter-energy/gpu": float(energy), "power/gpu": float(power)}),

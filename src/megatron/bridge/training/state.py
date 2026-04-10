@@ -420,7 +420,7 @@ def _timers_write_to_wandb(
     if writer is not None:
         for name in name_to_min_max_time:
             _, max_time = name_to_min_max_time[name]
-            writer.log({name + "-time": max_time}, iteration)
+            writer.log({"timing/" + name + "-time": max_time}, iteration)
 
 
 def _timers_write_to_mlflow(

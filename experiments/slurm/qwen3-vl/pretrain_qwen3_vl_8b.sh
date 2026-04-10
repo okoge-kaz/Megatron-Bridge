@@ -112,6 +112,8 @@ srun singularity exec \
     --throughput-window-size ${THROUGHPUT_WINDOW_SIZE} \
     --log-timers-to-tensorboard \
     --log-memory-to-tensorboard \
+    --log-runtime-to-tensorboard \
+    --log-world-size-to-tensorboard \
     --log-params-norm \
     --log-progress \
     --timing-log-level ${TIMING_LOG_LEVEL} \

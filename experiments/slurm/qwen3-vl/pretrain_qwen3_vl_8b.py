@@ -49,6 +49,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--log-memory-to-tensorboard", action="store_true", default=False)
     parser.add_argument("--log-params-norm", action="store_true", default=False)
     parser.add_argument("--log-progress", action="store_true", default=False)
+    parser.add_argument("--log-runtime-to-tensorboard", action="store_true", default=False)
+    parser.add_argument("--log-world-size-to-tensorboard", action="store_true", default=False)
     parser.add_argument("--timing-log-level", type=int, default=0, choices=[0, 1, 2])
 
     # wandb
@@ -98,6 +100,8 @@ def main() -> None:
     cfg.logger.log_memory_to_tensorboard = args.log_memory_to_tensorboard
     cfg.logger.log_params_norm = args.log_params_norm
     cfg.logger.log_progress = args.log_progress
+    cfg.logger.log_runtime_to_tensorboard = args.log_runtime_to_tensorboard
+    cfg.logger.log_world_size_to_tensorboard = args.log_world_size_to_tensorboard
     cfg.logger.timing_log_level = args.timing_log_level
 
     # wandb

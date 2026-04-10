@@ -362,9 +362,9 @@ def evaluate_and_print_results(
                 )
 
         if wandb_writer and is_last_rank():
-            wandb_writer.log({"{} validation".format(key): total_loss_dict[key].item()}, state.train_state.step)
+            wandb_writer.log({"loss/{} validation".format(key): total_loss_dict[key].item()}, state.train_state.step)
             if state.cfg.logger.log_validation_ppl_to_tensorboard:
-                wandb_writer.log({"{} validation ppl".format(key): ppl}, state.train_state.step)
+                wandb_writer.log({"loss/{} validation ppl".format(key): ppl}, state.train_state.step)
 
     if process_non_loss_data_func is not None and writer and is_last_rank():
         process_non_loss_data_func(collected_non_loss_data, state.train_state.step, writer)
