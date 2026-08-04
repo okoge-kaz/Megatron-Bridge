@@ -35,6 +35,7 @@ INFERENCE_TASKS = {
     "legacy-full-prefix-generation": Path("examples/conversion/hf_to_megatron_generate_text.py"),
     "vlm-generation": Path("scripts/inference/vlm_generation.py"),
     "model-comparison": Path("examples/conversion/compare_hf_and_megatron/compare.py"),
+    "hf-inference": Path("skills/create-model-verification-card/scripts/verify_hf_inference.py"),
 }
 
 
@@ -53,7 +54,8 @@ Example:
       --prompt "Megatron Bridge inference is" --max_new_tokens 32
 
 Use --task vlm-generation for multimodal generation or --task model-comparison
-for a one-step Hugging Face/Megatron comparison. The
+for a one-step Hugging Face/Megatron comparison. Use --task hf-inference to
+verify deterministic output from an exported Hugging Face checkpoint.
 legacy-full-prefix-generation task is a slow, non-optimized compatibility path
 for models that do not yet support cached inference and requires
 --legacy-full-prefix. Arguments not owned by this launcher are forwarded

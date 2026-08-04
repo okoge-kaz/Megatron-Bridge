@@ -90,6 +90,10 @@ for inline prompts, or pass a mounted line-oriented or JSONL file with
 Run the selected entry point with `--help` in a configured Megatron Bridge
 environment for its full CLI.
 
+Use `--task hf-inference` to reload an exported Hugging Face checkpoint and run
+one deterministic inference. Its forwarded model argument is `--hf-model`, and
+multimodal verification additionally uses `--image` and `--chat-template`.
+
 ## Environment and cluster options
 
 `--env` accepts names only. Export a value in the login-node environment, then
